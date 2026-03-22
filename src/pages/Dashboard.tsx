@@ -53,7 +53,6 @@ export default function Dashboard() {
     setSueldoTotal(totalSueldo);
     setMeta(ajustesRes.data?.meta_sueldo_mensual ?? 300000);
 
-    // Gastos por categoría
     const catMap: Record<string, number> = {};
     gastosNegRes.data?.forEach((g: any) => {
       const name = g.categorias_gasto?.nombre ?? 'Sin categoría';
@@ -61,7 +60,6 @@ export default function Dashboard() {
     });
     setGastosPorCategoria(Object.entries(catMap).map(([name, value]) => ({ name, value })));
 
-    // Últimos 6 meses
     const monthData: { mes: string; ventas: number; gastos: number }[] = [];
     for (let i = 5; i >= 0; i--) {
       const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
@@ -80,11 +78,18 @@ export default function Dashboard() {
         gastos: g.data?.reduce((s, x) => s + Number(x.monto), 0) ?? 0,
       });
     }
+
     setVentasMensuales(monthData);
     setLoading(false);
   }
 
-  if (loading) return <div className="flex items-center justify-center h-64"><p className="text-muted-foreground">Cargando...</p></div>;
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <p className="text-muted-foreground">Cargando...</p>
+      </div>
+    );
+  }
 
   const balance = ventas - gastos;
   const balancePersonal = sueldoTotal - gastosPersonales;
@@ -92,9 +97,18 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <div>
-        <h1 className="text-2xl font-bold">Dashboard</h1>
-        <p className="text-muted-foreground text-sm">Resumen del mes actual</p>
+      {/* Encabezado principal con logo a la izquierda */}
+      <div className="flex items-center gap-3">
+        <img
+          src="/logo.cuchara.webp"
+          alt="Mundo Prana"
+          className="w-10 h-10 object-contain"
+        />
+
+        <div>
+          <h1 className="text-2xl font-bold">Mundo Prana</h1>
+          <p className="text-muted-foreground text-sm">Inicio</p>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
@@ -104,11 +118,15 @@ export default function Dashboard() {
         <MetricCard title="Mi sueldo" value={formatCurrency(sueldoTotal)} icon={<Wallet className="w-4 h-4" />} />
       </div>
 
-      {/* Meta de sueldo */}
       <div className="bg-card rounded-lg border p-4 space-y-2">
         <div className="flex items-center justify-between text-sm">
-          <span className="flex items-center gap-2 text-muted-foreground"><Target className="w-4 h-4" /> Meta mensual</span>
-          <span className="font-medium">{formatCurrency(sueldoTotal)} / {formatCurrency(meta)}</span>
+          <span className="flex items-center gap-2 text-muted-foreground">
+            <Target className="w-4 h-4" />
+            Meta mensual
+          </span>
+          <span className="font-medium">
+            {formatCurrency(sueldoTotal)} / {formatCurrency(meta)}
+          </span>
         </div>
         <Progress value={progreso} className="h-2" />
         <p className="text-xs text-muted-foreground text-right">{progreso.toFixed(0)}%</p>
@@ -120,28 +138,38 @@ export default function Dashboard() {
       </div>
 
       <div className="grid md:grid-cols-2 gap-4">
-        {/* Gastos por categoría */}
         <div className="bg-card rounded-lg border p-4">
           <h3 className="text-sm font-medium mb-3">Gastos por categoría</h3>
           {gastosPorCategoria.length > 0 ? (
             <ResponsiveContainer width="100%" height={200}>
               <PieChart>
-                <Pie data={gastosPorCategoria} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={70} label={({ name }) => name}>
-                  {gastosPorCategoria.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                <Pie
+                  data={gastosPorCategoria}
+                  dataKey="value"
+                  nameKey="name"
+                  cx="50%"
+                  cy="50%"
+                  outerRadius={70}
+                  label={({ name }) => name}
+                >
+                  {gastosPorCategoria.map((_, i) => (
+                    <Cell key={i} fill={COLORS[i % COLORS.length]} />
+                  ))}
                 </Pie>
                 <Tooltip formatter={(v: number) => formatCurrency(v)} />
               </PieChart>
             </ResponsiveContainer>
-          ) : <p className="text-muted-foreground text-sm">Sin datos</p>}
+          ) : (
+            <p className="text-muted-foreground text-sm">Sin datos</p>
+          )}
         </div>
 
-        {/* Ventas vs Gastos */}
         <div className="bg-card rounded-lg border p-4">
           <h3 className="text-sm font-medium mb-3">Ventas vs Gastos (6 meses)</h3>
           <ResponsiveContainer width="100%" height={200}>
             <BarChart data={ventasMensuales}>
               <XAxis dataKey="mes" fontSize={12} />
-              <YAxis fontSize={12} tickFormatter={v => `${(v / 1000).toFixed(0)}k`} />
+              <YAxis fontSize={12} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
               <Tooltip formatter={(v: number) => formatCurrency(v)} />
               <Bar dataKey="ventas" fill="#1D9E75" radius={[4, 4, 0, 0]} />
               <Bar dataKey="gastos" fill="#e5e7eb" radius={[4, 4, 0, 0]} />

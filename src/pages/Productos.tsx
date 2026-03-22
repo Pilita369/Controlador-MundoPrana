@@ -204,6 +204,8 @@ export default function Productos() {
                     <SelectItem value="unidad">Unidad</SelectItem>
                     <SelectItem value="porción">Porción</SelectItem>
                     <SelectItem value="paquete">Paquete</SelectItem>
+                    <SelectItem value="docena">Docena</SelectItem>
+                    <SelectItem value="1/2 docena">Media docena</SelectItem>
                     <SelectItem value="kg">Kg</SelectItem>
                     <SelectItem value="g">Gramos</SelectItem>
                     <SelectItem value="litro">Litro</SelectItem>

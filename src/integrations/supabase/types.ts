@@ -68,6 +68,48 @@ export type Database = {
         }
         Relationships: []
       }
+      pedidos: {
+        Row: {
+          id: string
+          user_id: string
+          fecha: string
+          cliente: string | null
+          medio_cobro: string
+          subtotal: number
+          descuento_monto: number
+          descuento_porcentaje: number
+          total: number
+          notas: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          fecha?: string
+          cliente?: string | null
+          medio_cobro?: string
+          subtotal?: number
+          descuento_monto?: number
+          descuento_porcentaje?: number
+          total?: number
+          notas?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          fecha?: string
+          cliente?: string | null
+          medio_cobro?: string
+          subtotal?: number
+          descuento_monto?: number
+          descuento_porcentaje?: number
+          total?: number
+          notas?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
       gastos: {
         Row: {
           categoria_id: string | null
@@ -258,6 +300,7 @@ export type Database = {
           fecha: string
           id: string
           medio_cobro: string
+          pedido_id: string | null
           precio_unitario: number
           producto_id: string
           total: number
@@ -269,6 +312,7 @@ export type Database = {
           fecha?: string
           id?: string
           medio_cobro: string
+          pedido_id?: string | null
           precio_unitario: number
           producto_id: string
           total: number
@@ -280,6 +324,7 @@ export type Database = {
           fecha?: string
           id?: string
           medio_cobro?: string
+          pedido_id?: string | null
           precio_unitario?: number
           producto_id?: string
           total?: number

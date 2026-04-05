@@ -21,7 +21,7 @@ const SECCIONES: { key: SeccionBorrar; label: string; descripcion: string }[] = 
 
 export default function Ajustes() {
   const { user } = useAuth();
-  const [nombre, setNombre] = useState('Mundo Prana');
+  const [nombre, setNombre] = useState('Finanzas · Mundo Prana');
   const [meta, setMeta] = useState(300000);
   const [confirmBorrar, setConfirmBorrar] = useState<SeccionBorrar>(null);
   const [loading, setLoading] = useState(false);

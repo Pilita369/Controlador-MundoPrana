@@ -25,7 +25,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
           <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
             <Package className="w-4 h-4 text-primary-foreground" />
           </div>
-          <span className="font-semibold text-lg">Mundo Prana</span>
+          <span className="font-semibold text-lg">Finanzas · Mundo Prana</span>
         </div>
         {navItems.map(item => (
           <button

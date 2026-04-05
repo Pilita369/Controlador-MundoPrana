@@ -38,12 +38,12 @@ export default function Login() {
           <div className="mx-auto w-16 h-16 bg-primary/10 rounded-xl flex items-center justify-center p-2">
             <img
               src="/logo.cuchara.webp"
-              alt="Mundo Prana"
+              alt="Finanzas · Mundo Prana"
               className="w-full h-full object-contain"
             />
           </div>
 
-          <CardTitle className="text-2xl font-bold">Mundo Prana</CardTitle>
+          <CardTitle className="text-2xl font-bold">Finanzas · Mundo Prana</CardTitle>
           <p className="text-sm text-muted-foreground">
             Gestión de viandas saludables
           </p>

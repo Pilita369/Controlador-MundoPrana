@@ -101,12 +101,12 @@ export default function Dashboard() {
       <div className="flex items-center gap-3">
         <img
           src="/logo.cuchara.webp"
-          alt="Mundo Prana"
+          alt="Finanzas · Mundo Prana"
           className="w-10 h-10 object-contain"
         />
 
         <div>
-          <h1 className="text-2xl font-bold">Mundo Prana</h1>
+          <h1 className="text-2xl font-bold">Finanzas · Mundo Prana</h1>
           <p className="text-muted-foreground text-sm">Inicio</p>
         </div>
       </div>

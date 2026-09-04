@@ -324,6 +324,104 @@ export type Database = {
           },
         ]
       }
+      produccion_items: {
+        Row: {
+          cantidad: number | null
+          costo_calc: number | null
+          created_at: string
+          id: string
+          ingrediente_id: string | null
+          nombre_libre: string | null
+          produccion_id: string
+          unidad: string | null
+          user_id: string
+        }
+        Insert: {
+          cantidad?: number | null
+          costo_calc?: number | null
+          created_at?: string
+          id?: string
+          ingrediente_id?: string | null
+          nombre_libre?: string | null
+          produccion_id: string
+          unidad?: string | null
+          user_id: string
+        }
+        Update: {
+          cantidad?: number | null
+          costo_calc?: number | null
+          created_at?: string
+          id?: string
+          ingrediente_id?: string | null
+          nombre_libre?: string | null
+          produccion_id?: string
+          unidad?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "produccion_items_ingrediente_id_fkey"
+            columns: ["ingrediente_id"]
+            isOneToOne: false
+            referencedRelation: "productos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "produccion_items_produccion_id_fkey"
+            columns: ["produccion_id"]
+            isOneToOne: false
+            referencedRelation: "producciones"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      producciones: {
+        Row: {
+          cantidad_obtenida: number
+          costo_total: number | null
+          costo_unitario: number | null
+          created_at: string
+          fecha: string
+          id: string
+          nivel_precision: string
+          notas: string | null
+          producto_id: string
+          user_id: string
+        }
+        Insert: {
+          cantidad_obtenida: number
+          costo_total?: number | null
+          costo_unitario?: number | null
+          created_at?: string
+          fecha?: string
+          id?: string
+          nivel_precision?: string
+          notas?: string | null
+          producto_id: string
+          user_id: string
+        }
+        Update: {
+          cantidad_obtenida?: number
+          costo_total?: number | null
+          costo_unitario?: number | null
+          created_at?: string
+          fecha?: string
+          id?: string
+          nivel_precision?: string
+          notas?: string | null
+          producto_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "producciones_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "productos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       productos: {
         Row: {
           activo: boolean

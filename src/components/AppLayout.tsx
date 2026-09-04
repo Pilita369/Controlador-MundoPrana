@@ -1,22 +1,33 @@
-import { ReactNode } from 'react';
+import { ReactNode, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Home, ShoppingCart, Receipt, Wallet, Package, CalendarDays, Settings, LogOut } from 'lucide-react';
+import { Home, ShoppingCart, Receipt, Wallet, Package, CalendarDays, ChefHat, Settings, LogOut, Menu as MenuIcon } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { cn } from '@/lib/utils';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 
+// Todos los items: se muestran completos en el sidebar de escritorio.
 const navItems = [
   { path: '/', label: 'Inicio', icon: Home },
   { path: '/ventas', label: 'Ventas', icon: ShoppingCart },
+  { path: '/productos', label: 'Productos', icon: Package },
+  { path: '/produccion', label: 'Producción', icon: ChefHat },
+  { path: '/menus', label: 'Menús', icon: CalendarDays },
   { path: '/gastos', label: 'Gastos', icon: Receipt },
   { path: '/sueldo', label: 'Mi Sueldo', icon: Wallet },
-  { path: '/productos', label: 'Productos', icon: Package },
-  { path: '/menus', label: 'Menús', icon: CalendarDays },
 ];
+
+// En el celular solo entran comodamente 4-5: lo que se usa a diario.
+// El resto (Menús, Gastos, Sueldo, Ajustes) va detrás de "Más".
+const navMobilePrincipal = navItems.filter(i => ['/', '/ventas', '/productos', '/produccion'].includes(i.path));
+const navMobileMas = [...navItems.filter(i => !['/', '/ventas', '/productos', '/produccion'].includes(i.path)), { path: '/ajustes', label: 'Ajustes', icon: Settings }];
 
 export default function AppLayout({ children }: { children: ReactNode }) {
   const location = useLocation();
   const navigate = useNavigate();
   const { signOut } = useAuth();
+  const [masAbierto, setMasAbierto] = useState(false);
+
+  const enMas = navMobileMas.some(i => i.path === location.pathname);
 
   return (
     <div className="min-h-screen bg-background flex">
@@ -74,7 +85,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
 
       {/* Mobile Bottom Nav */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-card border-t flex justify-around py-2 z-50">
-        {navItems.map(item => (
+        {navMobilePrincipal.map(item => (
           <button
             key={item.path}
             onClick={() => navigate(item.path)}
@@ -89,7 +100,45 @@ export default function AppLayout({ children }: { children: ReactNode }) {
             {item.label}
           </button>
         ))}
+        <button
+          onClick={() => setMasAbierto(true)}
+          className={cn(
+            'flex flex-col items-center gap-0.5 px-2 py-1 text-xs transition-colors',
+            enMas ? 'text-primary font-medium' : 'text-muted-foreground'
+          )}
+        >
+          <MenuIcon className="w-5 h-5" />
+          Más
+        </button>
       </nav>
+
+      <Sheet open={masAbierto} onOpenChange={setMasAbierto}>
+        <SheetContent side="bottom" className="md:hidden rounded-t-xl">
+          <SheetHeader><SheetTitle>Más</SheetTitle></SheetHeader>
+          <div className="grid grid-cols-4 gap-3 py-4">
+            {navMobileMas.map(item => (
+              <button
+                key={item.path}
+                onClick={() => { navigate(item.path); setMasAbierto(false); }}
+                className={cn(
+                  'flex flex-col items-center gap-1.5 p-3 rounded-lg text-xs',
+                  location.pathname === item.path ? 'bg-primary/10 text-primary font-medium' : 'text-muted-foreground hover:bg-accent'
+                )}
+              >
+                <item.icon className="w-5 h-5" />
+                {item.label}
+              </button>
+            ))}
+            <button
+              onClick={() => { signOut(); setMasAbierto(false); }}
+              className="flex flex-col items-center gap-1.5 p-3 rounded-lg text-xs text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+            >
+              <LogOut className="w-5 h-5" />
+              Salir
+            </button>
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }

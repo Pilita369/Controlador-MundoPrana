@@ -38,6 +38,13 @@ const defaultMateria = { ...base, unidad_medida: 'kg', alerta_stock_bajo: 1 };
 const TAB_A_CLASE: Record<TabKey, Clase> = { elaborados: 'elaborado', bases: 'base', materia: 'materia_prima' };
 const LABEL_SINGULAR: Record<TabKey, string> = { elaborados: 'producto', bases: 'base', materia: 'materia prima' };
 
+// Conversiones fijas y conocidas: no tiene sentido pedirle a Pilar que las escriba.
+function equivalenciaFija(unidadMedida: string, unidadUso: string): number | undefined {
+  if (unidadMedida === 'kg' && unidadUso === 'g') return 1000;
+  if (unidadMedida === 'litro' && unidadUso === 'ml') return 1000;
+  return undefined;
+}
+
 function claseDe(p: Producto): Clase {
   if (p.clase === 'base' || p.clase === 'materia_prima' || p.clase === 'elaborado') return p.clase;
   return p.es_materia_prima ? 'materia_prima' : 'elaborado';
@@ -268,7 +275,11 @@ export default function Productos() {
               <div className="rounded-lg border border-dashed p-3 space-y-2">
                 <Label className="text-xs text-muted-foreground">¿Se usa en otra unidad al cocinar? (opcional)</Label>
                 <div className="grid grid-cols-2 gap-3">
-                  <Select value={form.unidad_uso || 'ninguna'} onValueChange={v => setForm(f => ({ ...f, unidad_uso: v === 'ninguna' ? '' : v }))}>
+                  <Select value={form.unidad_uso || 'ninguna'} onValueChange={v => setForm(f => {
+                    const unidad_uso = v === 'ninguna' ? '' : v;
+                    const fija = equivalenciaFija(f.unidad_medida, unidad_uso);
+                    return { ...f, unidad_uso, equivalencia_uso: fija ?? f.equivalencia_uso };
+                  })}>
                     <SelectTrigger className="h-9"><SelectValue placeholder="Unidad de uso" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="ninguna">No, es la misma</SelectItem>
@@ -278,7 +289,7 @@ export default function Productos() {
                     </SelectContent>
                   </Select>
                   {form.unidad_uso && (
-                    <Input type="number" step="0.01" placeholder={`${form.unidad_medida} = ? ${form.unidad_uso}`}
+                    <Input type="number" step="0.01" placeholder={`${form.unidad_medida} = ? ${form.unidad_uso}`} disabled={!!equivalenciaFija(form.unidad_medida, form.unidad_uso)}
                       value={form.equivalencia_uso || ''} onChange={e => setForm(f => ({ ...f, equivalencia_uso: parseFloat(e.target.value) || 0 }))} className="h-9" />
                   )}
                 </div>

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { formatCurrency } from '@/lib/format';
+import { formatCurrency, formatDate } from '@/lib/format';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -15,6 +15,8 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Plus, Edit2, AlertTriangle, History, Trash2, Search } from 'lucide-react';
 import { toast } from 'sonner';
 import ImportarIA from '@/components/ImportarIA';
+import ActualizarPrecios from '@/components/ActualizarPrecios';
+import { cargarHistorialPrecio, type EntradaHistorial } from '@/lib/precios';
 
 type Clase = 'elaborado' | 'base' | 'materia_prima';
 type TabKey = 'elaborados' | 'bases' | 'materia';
@@ -57,6 +59,7 @@ export default function Productos() {
   const [selectMode, setSelectMode] = useState(false);
   const [deleteMultiConfirm, setDeleteMultiConfirm] = useState(false);
   const [deleteSingleId, setDeleteSingleId] = useState<string | null>(null);
+  const [historialPrecio, setHistorialPrecio] = useState<EntradaHistorial[]>([]);
 
   useEffect(() => { if (user) load(); }, [user]);
   useEffect(() => { setBusqueda(''); setSelected(new Set()); setSelectMode(false); }, [tab]);
@@ -75,6 +78,7 @@ export default function Productos() {
 
   function openNew() {
     setEditId(null);
+    setHistorialPrecio([]);
     setForm(esMateria ? defaultMateria : tab === 'bases' ? defaultBase : defaultElaborado);
     setOpen(true);
   }
@@ -88,6 +92,7 @@ export default function Productos() {
       alerta_stock_bajo: p.alerta_stock_bajo, activo: p.activo, categoria: p.categoria ?? '',
     });
     setOpen(true);
+    cargarHistorialPrecio(p.id).then(setHistorialPrecio);
   }
 
   function calcPrecioSugerido() {
@@ -111,10 +116,17 @@ export default function Productos() {
       precio_venta: esVendible ? form.precio_venta : 0,
     };
     if (editId) {
+      const original = productos.find(p => p.id === editId);
       await supabase.from('productos').update(payload).eq('id', editId);
+      if (original && Number(original.precio_costo) !== Number(payload.precio_costo)) {
+        await supabase.from('precios_historial').insert({ user_id: user!.id, producto_id: editId, precio_costo: payload.precio_costo, fuente: 'manual' });
+      }
       toast.success('Actualizado');
     } else {
-      await supabase.from('productos').insert(payload);
+      const { data } = await supabase.from('productos').insert(payload).select('id').single();
+      if (data && payload.precio_costo > 0) {
+        await supabase.from('precios_historial').insert({ user_id: user!.id, producto_id: data.id, precio_costo: payload.precio_costo, fuente: 'manual' });
+      }
       toast.success('Creado');
     }
     setOpen(false); load();
@@ -167,6 +179,7 @@ export default function Productos() {
         <h1 className="text-2xl font-bold">Productos</h1>
         <div className="flex gap-2 flex-wrap">
           <ImportarIA target="productos" onDone={load} />
+          <ActualizarPrecios onDone={load} />
           <Button variant="outline" size="sm" onClick={loadHistory}><History className="w-4 h-4 mr-1" /> Historial</Button>
           {!selectMode
             ? <Button variant="outline" size="sm" onClick={() => setSelectMode(true)}><Trash2 className="w-4 h-4 mr-1" /> Seleccionar</Button>
@@ -236,7 +249,15 @@ export default function Productos() {
               </div>
             </div>
 
-            <div><Label>Precio de costo</Label><Input type="number" step="0.01" value={form.precio_costo} onChange={e => setForm(f => ({ ...f, precio_costo: parseFloat(e.target.value) || 0 }))} /></div>
+            <div>
+              <Label>Precio de costo</Label>
+              <Input type="number" step="0.01" value={form.precio_costo} onChange={e => setForm(f => ({ ...f, precio_costo: parseFloat(e.target.value) || 0 }))} />
+              {historialPrecio.length > 0 && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Historial: {historialPrecio.map(h => `${formatCurrency(h.precio_costo)} (${formatDate(h.created_at.slice(0, 10))})`).join(' · ')}
+                </p>
+              )}
+            </div>
 
             {!esMateria && (
               <>

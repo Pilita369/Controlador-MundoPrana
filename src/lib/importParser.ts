@@ -123,6 +123,34 @@ export function parseTexto(texto: string): FilaImport[] {
   return filas;
 }
 
+// ─── Lista de precios (actualizacion rapida) ──────────────────────────────────
+// "Pollo ahora $4.500 el kilo, lentejas $11.000, huevos $8.000 el maple"
+
+export interface FilaPrecio { nombre: string; precio: number; }
+
+const RELLENO_PRECIO = /\b(ahora|cuesta|sale|vale|est[aá]|qued[oó]|pas[oó]?\s*a|aument[oó]\s*a|subi[oó]\s*a|baj[oó]\s*a)\b/gi;
+const ARTICULO_INICIAL = /^(el|la|los|las)\s+/i;
+
+export function parseListaPrecios(texto: string): FilaPrecio[] {
+  const filas: FilaPrecio[] = [];
+  for (const seg0 of texto.split(/[,\n]+/)) {
+    const seg = seg0.trim();
+    if (!seg) continue;
+    const m = seg.match(/\$\s*[\d.,]+|\b\d{2,}(?:[.,]\d+)?\b/);
+    if (!m || m.index === undefined) continue;
+    const precio = parsePrecioAR(m[0]);
+    if (precio === undefined) continue;
+    const nombre = seg.slice(0, m.index)
+      .replace(RELLENO_PRECIO, '')
+      .replace(/[-–:]\s*$/, '')
+      .replace(/\s{2,}/g, ' ')
+      .trim()
+      .replace(ARTICULO_INICIAL, '');
+    if (nombre) filas.push({ nombre, precio });
+  }
+  return filas;
+}
+
 // ─── CSV ──────────────────────────────────────────────────────────────────────
 
 const COL = {

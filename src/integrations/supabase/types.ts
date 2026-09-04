@@ -286,6 +286,44 @@ export type Database = {
         }
         Relationships: []
       }
+      precios_historial: {
+        Row: {
+          created_at: string
+          fuente: string
+          id: string
+          notas: string | null
+          precio_costo: number
+          producto_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          fuente?: string
+          id?: string
+          notas?: string | null
+          precio_costo: number
+          producto_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          fuente?: string
+          id?: string
+          notas?: string | null
+          precio_costo?: number
+          producto_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "precios_historial_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "productos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       productos: {
         Row: {
           activo: boolean

@@ -14,21 +14,36 @@ import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Plus, Edit2, AlertTriangle, History, Trash2, Search } from 'lucide-react';
 import { toast } from 'sonner';
+import ImportarIA from '@/components/ImportarIA';
+
+type Clase = 'elaborado' | 'base' | 'materia_prima';
+type TabKey = 'elaborados' | 'bases' | 'materia';
 
 interface Producto {
   id: string; nombre: string; tipo: string; precio_costo: number; precio_venta: number;
   porcentaje_ganancia: number | null; precio_venta_manual: boolean; stock_actual: number;
   unidad_medida: string; alerta_stock_bajo: number; activo: boolean; es_materia_prima: boolean;
+  clase: string | null; categoria: string | null;
 }
 interface Movimiento { id: string; tipo: string; cantidad: number; notas: string | null; created_at: string; productos: { nombre: string } | null; }
 
-const defaultElaborado = { nombre: '', tipo: 'fresco', precio_costo: 0, precio_venta: 0, porcentaje_ganancia: 0, precio_venta_manual: true, stock_actual: 0, unidad_medida: 'unidad', alerta_stock_bajo: 5, activo: true, es_materia_prima: false };
-const defaultMateria = { nombre: '', tipo: 'fresco', precio_costo: 0, precio_venta: 0, porcentaje_ganancia: 0, precio_venta_manual: true, stock_actual: 0, unidad_medida: 'kg', alerta_stock_bajo: 1, activo: true, es_materia_prima: true };
+const base = { nombre: '', tipo: 'fresco', precio_costo: 0, precio_venta: 0, porcentaje_ganancia: 0, precio_venta_manual: true, stock_actual: 0, alerta_stock_bajo: 5, activo: true, categoria: '' };
+const defaultElaborado = { ...base, unidad_medida: 'unidad' };
+const defaultBase = { ...base, unidad_medida: 'unidad', alerta_stock_bajo: 1 };
+const defaultMateria = { ...base, unidad_medida: 'kg', alerta_stock_bajo: 1 };
+
+const TAB_A_CLASE: Record<TabKey, Clase> = { elaborados: 'elaborado', bases: 'base', materia: 'materia_prima' };
+const LABEL_SINGULAR: Record<TabKey, string> = { elaborados: 'producto', bases: 'base', materia: 'materia prima' };
+
+function claseDe(p: Producto): Clase {
+  if (p.clase === 'base' || p.clase === 'materia_prima' || p.clase === 'elaborado') return p.clase;
+  return p.es_materia_prima ? 'materia_prima' : 'elaborado';
+}
 
 export default function Productos() {
   const { user } = useAuth();
   const [productos, setProductos] = useState<Producto[]>([]);
-  const [tab, setTab] = useState<'elaborados' | 'materia'>('elaborados');
+  const [tab, setTab] = useState<TabKey>('elaborados');
   const [busqueda, setBusqueda] = useState('');
   const [open, setOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
@@ -51,14 +66,16 @@ export default function Productos() {
     setProductos((data as any) ?? []);
   }
 
+  const claseTab = TAB_A_CLASE[tab];
   const esMateria = tab === 'materia';
+  const esVendible = tab === 'elaborados';
   const listaFiltrada = productos
-    .filter(p => (p.es_materia_prima ?? false) === esMateria)
+    .filter(p => claseDe(p) === claseTab)
     .filter(p => p.nombre.toLowerCase().includes(busqueda.toLowerCase()));
 
   function openNew() {
     setEditId(null);
-    setForm(esMateria ? defaultMateria : defaultElaborado);
+    setForm(esMateria ? defaultMateria : tab === 'bases' ? defaultBase : defaultElaborado);
     setOpen(true);
   }
 
@@ -68,7 +85,7 @@ export default function Productos() {
       nombre: p.nombre, tipo: p.tipo, precio_costo: p.precio_costo, precio_venta: p.precio_venta,
       porcentaje_ganancia: p.porcentaje_ganancia ?? 0, precio_venta_manual: p.precio_venta_manual,
       stock_actual: p.stock_actual, unidad_medida: p.unidad_medida,
-      alerta_stock_bajo: p.alerta_stock_bajo, activo: p.activo, es_materia_prima: p.es_materia_prima ?? false,
+      alerta_stock_bajo: p.alerta_stock_bajo, activo: p.activo, categoria: p.categoria ?? '',
     });
     setOpen(true);
   }
@@ -87,9 +104,11 @@ export default function Productos() {
     const payload = {
       ...form,
       user_id: user!.id,
-      es_materia_prima: esMateria,
+      clase: claseTab,
+      es_materia_prima: claseTab === 'materia_prima',
+      categoria: form.categoria || null,
       porcentaje_ganancia: form.precio_venta_manual ? null : form.porcentaje_ganancia,
-      precio_venta: esMateria ? 0 : form.precio_venta,
+      precio_venta: esVendible ? form.precio_venta : 0,
     };
     if (editId) {
       await supabase.from('productos').update(payload).eq('id', editId);
@@ -110,7 +129,7 @@ export default function Productos() {
   async function submitAjuste() {
     if (!ajusteProducto || ajusteCantidad === 0) return;
     await supabase.from('productos').update({ stock_actual: ajusteProducto.stock_actual + ajusteCantidad }).eq('id', ajusteProducto.id);
-    await supabase.from('stock_movimientos').insert({ user_id: user!.id, producto_id: ajusteProducto.id, tipo: ajusteCantidad > 0 ? 'produccion' : 'ajuste', cantidad: ajusteCantidad, notas: 'Ajuste manual' });
+    await supabase.from('stock_movimientos').insert({ user_id: user!.id, producto_id: ajusteProducto.id, tipo: 'ajuste', cantidad: ajusteCantidad, notas: 'Ajuste manual' });
     toast.success('Stock ajustado');
     setAjusteOpen(false); setAjusteCantidad(0); load();
   }
@@ -140,13 +159,14 @@ export default function Productos() {
     else setSelected(new Set(listaFiltrada.map(p => p.id)));
   }
 
-  const tipoLabel: Record<string, string> = { produccion: 'Producción', venta: 'Venta', retiro_duena: 'Retiro dueña', ajuste: 'Ajuste' };
+  const tipoLabel: Record<string, string> = { produccion: 'Producción', venta: 'Venta', retiro_duena: 'Retiro dueña', ajuste: 'Ajuste', perdida: 'Pérdida', consumo_interno: 'Consumo interno', otro: 'Otro' };
 
   return (
     <div className="space-y-4 animate-fade-in">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-2 flex-wrap">
         <h1 className="text-2xl font-bold">Productos</h1>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
+          <ImportarIA target="productos" onDone={load} />
           <Button variant="outline" size="sm" onClick={loadHistory}><History className="w-4 h-4 mr-1" /> Historial</Button>
           {!selectMode
             ? <Button variant="outline" size="sm" onClick={() => setSelectMode(true)}><Trash2 className="w-4 h-4 mr-1" /> Seleccionar</Button>
@@ -157,9 +177,10 @@ export default function Productos() {
       </div>
 
       {/* Pestañas */}
-      <Tabs value={tab} onValueChange={v => setTab(v as any)}>
+      <Tabs value={tab} onValueChange={v => setTab(v as TabKey)}>
         <TabsList className="w-full">
           <TabsTrigger value="elaborados" className="flex-1">Elaborados</TabsTrigger>
+          <TabsTrigger value="bases" className="flex-1">Bases</TabsTrigger>
           <TabsTrigger value="materia" className="flex-1">Materia prima</TabsTrigger>
         </TabsList>
       </Tabs>
@@ -168,7 +189,7 @@ export default function Productos() {
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
         <Input
-          placeholder={`Buscar ${esMateria ? 'materia prima' : 'producto'}...`}
+          placeholder={`Buscar ${LABEL_SINGULAR[tab]}...`}
           value={busqueda}
           onChange={e => setBusqueda(e.target.value)}
           className="pl-9"
@@ -191,12 +212,12 @@ export default function Productos() {
       {/* Modal nuevo/editar */}
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-h-[90vh] overflow-y-auto">
-          <DialogHeader><DialogTitle>{editId ? 'Editar' : 'Nuevo'} {esMateria ? 'materia prima' : 'producto'}</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{editId ? 'Editar' : 'Nuevo'} {LABEL_SINGULAR[tab]}</DialogTitle></DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-3">
             <div><Label>Nombre</Label><Input value={form.nombre} onChange={e => setForm(f => ({ ...f, nombre: e.target.value }))} required /></div>
 
             <div className="grid grid-cols-2 gap-3">
-              <div><Label>Stock actual</Label><Input type="number" step="0.01" value={form.stock_actual} onChange={e => setForm(f => ({ ...f, stock_actual: parseFloat(e.target.value) || 0 }))} /></div>
+              <div><Label>Stock actual</Label><Input type="number" step="0.001" value={form.stock_actual} onChange={e => setForm(f => ({ ...f, stock_actual: parseFloat(e.target.value) || 0 }))} /></div>
               <div><Label>Unidad</Label>
                 <Select value={form.unidad_medida} onValueChange={v => setForm(f => ({ ...f, unidad_medida: v }))}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
@@ -219,12 +240,29 @@ export default function Productos() {
 
             {!esMateria && (
               <>
-                <div><Label>Tipo</Label>
-                  <Select value={form.tipo} onValueChange={v => setForm(f => ({ ...f, tipo: v }))}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent><SelectItem value="fresco">Fresco</SelectItem><SelectItem value="congelado">Congelado</SelectItem></SelectContent>
-                  </Select>
+                <div className="grid grid-cols-2 gap-3">
+                  <div><Label>Tipo</Label>
+                    <Select value={form.tipo} onValueChange={v => setForm(f => ({ ...f, tipo: v }))}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent><SelectItem value="fresco">Fresco</SelectItem><SelectItem value="congelado">Congelado</SelectItem></SelectContent>
+                    </Select>
+                  </div>
+                  <div><Label>Categoría</Label>
+                    <Select value={form.categoria || 'ninguna'} onValueChange={v => setForm(f => ({ ...f, categoria: v === 'ninguna' ? '' : v }))}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="ninguna">Sin categoría</SelectItem>
+                        <SelectItem value="vegetariano">Vegetariano</SelectItem>
+                        <SelectItem value="carne">Carne</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
+              </>
+            )}
+
+            {esVendible && (
+              <>
                 <div className="grid grid-cols-2 gap-3">
                   <div><Label>Precio venta</Label><Input type="number" step="0.01" value={form.precio_venta} onChange={e => setForm(f => ({ ...f, precio_venta: parseFloat(e.target.value) || 0 }))} disabled={!form.precio_venta_manual} /></div>
                   <div className="flex flex-col justify-end">
@@ -250,7 +288,7 @@ export default function Productos() {
         <DialogContent>
           <DialogHeader><DialogTitle>Ajustar stock: {ajusteProducto?.nombre}</DialogTitle></DialogHeader>
           <p className="text-sm text-muted-foreground">Stock actual: {ajusteProducto?.stock_actual} {ajusteProducto?.unidad_medida}</p>
-          <div><Label>Cantidad a agregar (negativo para restar)</Label><Input type="number" step="0.01" value={ajusteCantidad} onChange={e => setAjusteCantidad(parseFloat(e.target.value) || 0)} /></div>
+          <div><Label>Cantidad a agregar (negativo para restar)</Label><Input type="number" step="0.001" value={ajusteCantidad} onChange={e => setAjusteCantidad(parseFloat(e.target.value) || 0)} /></div>
           <Button onClick={submitAjuste} className="w-full">Ajustar</Button>
         </DialogContent>
       </Dialog>
@@ -309,12 +347,13 @@ export default function Productos() {
               <div className="flex items-center gap-2 flex-wrap">
                 <p className="font-medium text-sm">{p.nombre}</p>
                 {!esMateria && <Badge variant={p.tipo === 'fresco' ? 'default' : 'secondary'} className="text-xs">{p.tipo}</Badge>}
+                {p.categoria && <Badge variant="outline" className="text-xs">{p.categoria === 'carne' ? 'Carne' : 'Veggie'}</Badge>}
                 {p.stock_actual <= p.alerta_stock_bajo && p.activo && <Badge variant="destructive" className="text-xs"><AlertTriangle className="w-3 h-3 mr-1" />Stock bajo</Badge>}
                 {!p.activo && <Badge variant="outline" className="text-xs">Inactivo</Badge>}
               </div>
               <p className="text-xs text-muted-foreground mt-0.5">
                 Costo: {formatCurrency(p.precio_costo)}
-                {!esMateria && ` · Venta: ${formatCurrency(p.precio_venta)}`}
+                {esVendible && ` · Venta: ${formatCurrency(p.precio_venta)}`}
                 {' · '}Stock: {p.stock_actual} {p.unidad_medida}
               </p>
             </div>
@@ -329,7 +368,7 @@ export default function Productos() {
         ))}
         {listaFiltrada.length === 0 && (
           <p className="text-muted-foreground text-sm text-center py-8">
-            {busqueda ? 'No se encontraron resultados' : `No hay ${esMateria ? 'materia prima' : 'productos'} cargados`}
+            {busqueda ? 'No se encontraron resultados' : `No hay ${LABEL_SINGULAR[tab]} cargados`}
           </p>
         )}
       </div>

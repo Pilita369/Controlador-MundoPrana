@@ -145,7 +145,7 @@ export default function Ventas() {
   async function loadProductos() {
     const { data } = await supabase.from('productos')
       .select('id, nombre, precio_venta, stock_actual')
-      .match({ user_id: user!.id, activo: true, es_materia_prima: false });
+      .match({ user_id: user!.id, activo: true, clase: 'elaborado' });
     if (data) setProductos((data as unknown as Producto[]) ?? []);
   }
 

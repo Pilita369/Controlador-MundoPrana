@@ -11,6 +11,7 @@ import Ventas from "@/pages/Ventas";
 import Gastos from "@/pages/Gastos";
 import Sueldo from "@/pages/Sueldo";
 import Productos from "@/pages/Productos";
+import Menus from "@/pages/Menus";
 import Ajustes from "@/pages/Ajustes";
 import NotFound from "@/pages/NotFound";
 
@@ -44,6 +45,7 @@ const App = () => (
             <Route path="/gastos" element={<ProtectedRoute><Gastos /></ProtectedRoute>} />
             <Route path="/sueldo" element={<ProtectedRoute><Sueldo /></ProtectedRoute>} />
             <Route path="/productos" element={<ProtectedRoute><Productos /></ProtectedRoute>} />
+            <Route path="/menus" element={<ProtectedRoute><Menus /></ProtectedRoute>} />
             <Route path="/ajustes" element={<ProtectedRoute><Ajustes /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>

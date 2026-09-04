@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.4"
+    PostgrestVersion: "14.5"
   }
   public: {
     Tables: {
@@ -68,48 +68,6 @@ export type Database = {
         }
         Relationships: []
       }
-      pedidos: {
-        Row: {
-          id: string
-          user_id: string
-          fecha: string
-          cliente: string | null
-          medio_cobro: string
-          subtotal: number
-          descuento_monto: number
-          descuento_porcentaje: number
-          total: number
-          notas: string | null
-          created_at: string
-        }
-        Insert: {
-          id?: string
-          user_id: string
-          fecha?: string
-          cliente?: string | null
-          medio_cobro?: string
-          subtotal?: number
-          descuento_monto?: number
-          descuento_porcentaje?: number
-          total?: number
-          notas?: string | null
-          created_at?: string
-        }
-        Update: {
-          id?: string
-          user_id?: string
-          fecha?: string
-          cliente?: string | null
-          medio_cobro?: string
-          subtotal?: number
-          descuento_monto?: number
-          descuento_porcentaje?: number
-          total?: number
-          notas?: string | null
-          created_at?: string
-        }
-        Relationships: []
-      }
       gastos: {
         Row: {
           categoria_id: string | null
@@ -157,11 +115,185 @@ export type Database = {
           },
         ]
       }
+      importaciones: {
+        Row: {
+          created_at: string
+          crudo: string | null
+          estado: string
+          id: string
+          notas: string | null
+          origen: string
+          payload: Json
+          tipo: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          crudo?: string | null
+          estado?: string
+          id?: string
+          notas?: string | null
+          origen: string
+          payload?: Json
+          tipo: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          crudo?: string | null
+          estado?: string
+          id?: string
+          notas?: string | null
+          origen?: string
+          payload?: Json
+          tipo?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      menu_items: {
+        Row: {
+          categoria: string | null
+          created_at: string
+          dia_semana: number | null
+          fecha: string | null
+          id: string
+          menu_id: string
+          nombre_plato: string
+          orden: number
+          precio: number | null
+          producto_id: string | null
+          user_id: string
+        }
+        Insert: {
+          categoria?: string | null
+          created_at?: string
+          dia_semana?: number | null
+          fecha?: string | null
+          id?: string
+          menu_id: string
+          nombre_plato: string
+          orden?: number
+          precio?: number | null
+          producto_id?: string | null
+          user_id: string
+        }
+        Update: {
+          categoria?: string | null
+          created_at?: string
+          dia_semana?: number | null
+          fecha?: string | null
+          id?: string
+          menu_id?: string
+          nombre_plato?: string
+          orden?: number
+          precio?: number | null
+          producto_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "menu_items_menu_id_fkey"
+            columns: ["menu_id"]
+            isOneToOne: false
+            referencedRelation: "menus"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "menu_items_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "productos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      menus: {
+        Row: {
+          created_at: string
+          id: string
+          mes: string | null
+          nombre: string
+          notas: string | null
+          tipo: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          mes?: string | null
+          nombre: string
+          notas?: string | null
+          tipo: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          mes?: string | null
+          nombre?: string
+          notas?: string | null
+          tipo?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      pedidos: {
+        Row: {
+          cliente: string | null
+          created_at: string
+          descuento_monto: number
+          descuento_porcentaje: number
+          fecha: string
+          id: string
+          medio_cobro: string
+          notas: string | null
+          subtotal: number
+          total: number
+          user_id: string
+        }
+        Insert: {
+          cliente?: string | null
+          created_at?: string
+          descuento_monto?: number
+          descuento_porcentaje?: number
+          fecha?: string
+          id?: string
+          medio_cobro?: string
+          notas?: string | null
+          subtotal?: number
+          total?: number
+          user_id: string
+        }
+        Update: {
+          cliente?: string | null
+          created_at?: string
+          descuento_monto?: number
+          descuento_porcentaje?: number
+          fecha?: string
+          id?: string
+          medio_cobro?: string
+          notas?: string | null
+          subtotal?: number
+          total?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
       productos: {
         Row: {
           activo: boolean
           alerta_stock_bajo: number
+          categoria: string | null
+          clase: string
           created_at: string
+          es_materia_prima: boolean
           id: string
           nombre: string
           porcentaje_ganancia: number | null
@@ -177,7 +309,10 @@ export type Database = {
         Insert: {
           activo?: boolean
           alerta_stock_bajo?: number
+          categoria?: string | null
+          clase?: string
           created_at?: string
+          es_materia_prima?: boolean
           id?: string
           nombre: string
           porcentaje_ganancia?: number | null
@@ -193,7 +328,10 @@ export type Database = {
         Update: {
           activo?: boolean
           alerta_stock_bajo?: number
+          categoria?: string | null
+          clase?: string
           created_at?: string
+          es_materia_prima?: boolean
           id?: string
           nombre?: string
           porcentaje_ganancia?: number | null
@@ -332,6 +470,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "ventas_pedido_id_fkey"
+            columns: ["pedido_id"]
+            isOneToOne: false
+            referencedRelation: "pedidos"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "ventas_producto_id_fkey"
             columns: ["producto_id"]
             isOneToOne: false
@@ -364,12 +509,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -393,11 +538,11 @@ export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -418,11 +563,11 @@ export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -443,11 +588,11 @@ export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -460,11 +605,11 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+    : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }

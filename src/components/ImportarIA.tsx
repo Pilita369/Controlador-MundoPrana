@@ -11,11 +11,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Sparkles, Upload, X, Camera, Mic } from 'lucide-react';
+import { Sparkles, Upload, X, Camera, Mic, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { parseTexto, parseCSV, normalizarNombre, type FilaImport } from '@/lib/importParser';
 
 type Target = 'productos' | 'menu';
+type Origen = 'texto' | 'csv' | 'imagen';
 
 interface MenuLite { id: string; nombre: string; tipo: string; }
 
@@ -32,14 +33,16 @@ const nuevoKey = () => `f${++contador}`;
 export default function ImportarIA({ target, onDone }: { target: Target; onDone: () => void }) {
   const { user } = useAuth();
   const [open, setOpen] = useState(false);
-  const [origen, setOrigen] = useState<'texto' | 'csv'>('texto');
+  const [origen, setOrigen] = useState<Origen>('texto');
   const [texto, setTexto] = useState('');
   const [archivoNombre, setArchivoNombre] = useState('');
   const [filas, setFilas] = useState<FilaEditable[]>([]);
   const [guardando, setGuardando] = useState(false);
+  const [analizando, setAnalizando] = useState(false);
   const [menus, setMenus] = useState<MenuLite[]>([]);
   const [menuId, setMenuId] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
+  const imagenRef = useRef<HTMLInputElement>(null);
 
   // productos existentes para detectar duplicados
   const [existentes, setExistentes] = useState<Record<string, string>>({});
@@ -64,14 +67,17 @@ export default function ImportarIA({ target, onDone }: { target: Target; onDone:
   const menuActual = menus.find(m => m.id === menuId);
   const esMenuMediodia = menuActual?.tipo === 'mediodia';
 
-  function interpretar() {
-    const crudas = origen === 'texto' ? parseTexto(texto) : parseCSV(texto);
+  function construirFilas(crudas: FilaImport[]) {
     if (crudas.length === 0) { toast.error('No se reconoció ninguna fila. Revisá el formato.'); return; }
     const eds: FilaEditable[] = crudas.map(f => {
       const existeId = target === 'productos' ? existentes[normalizarNombre(f.nombre)] : undefined;
       return { ...f, _key: nuevoKey(), _incluir: true, _existeId: existeId, _accion: existeId ? 'mantener' : 'crear' };
     });
     setFilas(eds);
+  }
+
+  function interpretar() {
+    construirFilas(origen === 'texto' ? parseTexto(texto) : parseCSV(texto));
   }
 
   async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
@@ -81,6 +87,41 @@ export default function ImportarIA({ target, onDone }: { target: Target; onDone:
     const txt = await file.text();
     setTexto(txt);
     setOrigen('csv');
+  }
+
+  function archivoABase64(file: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result).split(',')[1] ?? '');
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+
+  async function onImagen(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setArchivoNombre(file.name);
+    setAnalizando(true);
+    try {
+      const base64 = await archivoABase64(file);
+      const { data, error } = await supabase.functions.invoke('parse-productos-imagen', {
+        body: { base64, mimeType: file.type },
+      });
+      if (error) throw error;
+      if (data?.error) { toast.error(data.error); return; }
+      const crudas: FilaImport[] = (data?.productos ?? []).map((p: any) => ({
+        nombre: p.nombre,
+        precio: p.precio_venta ?? undefined,
+        tipo: p.tipo ?? undefined,
+        categoria: p.categoria ?? undefined,
+      }));
+      construirFilas(crudas);
+    } catch (err: any) {
+      toast.error(err?.message ?? 'No se pudo analizar el archivo');
+    } finally {
+      setAnalizando(false);
+    }
   }
 
   function editar(key: string, campos: Partial<FilaEditable>) {
@@ -195,10 +236,11 @@ export default function ImportarIA({ target, onDone }: { target: Target; onDone:
           )}
 
           {filas.length === 0 ? (
-            <Tabs value={origen} onValueChange={v => setOrigen(v as any)}>
+            <Tabs value={origen} onValueChange={v => setOrigen(v as Origen)}>
               <TabsList className="w-full">
                 <TabsTrigger value="texto" className="flex-1">Pegar texto</TabsTrigger>
                 <TabsTrigger value="csv" className="flex-1">CSV</TabsTrigger>
+                <TabsTrigger value="imagen" className="flex-1">Foto/PDF</TabsTrigger>
               </TabsList>
               <TabsContent value="texto" className="space-y-2">
                 <Textarea
@@ -208,6 +250,7 @@ export default function ImportarIA({ target, onDone }: { target: Target; onDone:
                   placeholder={'Hamburguesa de lentejas, $10.000, congelada, vegetariana\nTarta integral 10000 congelada\nMilanesa de pollo x4 - 8500 - carne'}
                 />
                 <p className="text-xs text-muted-foreground">Una línea por producto. El nombre primero; precio, tipo (fresco/congelado) y categoría (vegetariano/carne) en cualquier orden.</p>
+                <Button className="w-full" onClick={interpretar} disabled={!texto.trim() || (target === 'menu' && !menuId)}>Interpretar</Button>
               </TabsContent>
               <TabsContent value="csv" className="space-y-2">
                 <input ref={fileRef} type="file" accept=".csv,text/csv,text/plain" hidden onChange={onFile} />
@@ -215,17 +258,21 @@ export default function ImportarIA({ target, onDone }: { target: Target; onDone:
                   <Upload className="w-4 h-4 mr-1" /> {archivoNombre || 'Elegir archivo CSV'}
                 </Button>
                 <p className="text-xs text-muted-foreground">Desde Excel o Google Sheets: Archivo → Descargar → CSV. Se reconocen columnas Nombre, Precio, Tipo, Categoría{target === 'menu' ? ', Fecha' : ''}.</p>
+                <Button className="w-full" onClick={interpretar} disabled={!texto.trim() || (target === 'menu' && !menuId)}>Interpretar</Button>
+              </TabsContent>
+              <TabsContent value="imagen" className="space-y-2">
+                <input ref={imagenRef} type="file" accept="image/*,.pdf" hidden onChange={onImagen} disabled={target === 'menu' && !menuId} />
+                <Button type="button" variant="outline" className="w-full" onClick={() => imagenRef.current?.click()} disabled={analizando || (target === 'menu' && !menuId)}>
+                  {analizando
+                    ? <><Loader2 className="w-4 h-4 mr-1 animate-spin" /> Analizando...</>
+                    : <><Camera className="w-4 h-4 mr-1" /> {archivoNombre || 'Subir foto o PDF'}</>}
+                </Button>
+                <p className="text-xs text-muted-foreground">Subí una foto de la carta o un PDF. La IA identifica los productos; después revisás y confirmás antes de guardar.</p>
               </TabsContent>
 
-              <div className="flex items-center gap-2 pt-2 opacity-60">
-                <Badge variant="outline" className="gap-1"><Camera className="w-3 h-3" /> Foto/PDF</Badge>
-                <Badge variant="outline" className="gap-1"><Mic className="w-3 h-3" /> Voz</Badge>
-                <span className="text-xs text-muted-foreground">próximamente (requieren configurar la API)</span>
+              <div className="flex items-center gap-2 pt-1 opacity-60">
+                <Badge variant="outline" className="gap-1"><Mic className="w-3 h-3" /> Voz — próximamente</Badge>
               </div>
-
-              <Button className="w-full mt-2" onClick={interpretar} disabled={!texto.trim() || (target === 'menu' && !menuId)}>
-                Interpretar
-              </Button>
             </Tabs>
           ) : (
             <div className="space-y-3">

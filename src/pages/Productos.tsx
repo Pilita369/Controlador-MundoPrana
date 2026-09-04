@@ -26,10 +26,11 @@ interface Producto {
   porcentaje_ganancia: number | null; precio_venta_manual: boolean; stock_actual: number;
   unidad_medida: string; alerta_stock_bajo: number; activo: boolean; es_materia_prima: boolean;
   clase: string | null; categoria: string | null;
+  unidad_uso: string | null; equivalencia_uso: number | null;
 }
 interface Movimiento { id: string; tipo: string; cantidad: number; notas: string | null; created_at: string; productos: { nombre: string } | null; }
 
-const base = { nombre: '', tipo: 'fresco', precio_costo: 0, precio_venta: 0, porcentaje_ganancia: 0, precio_venta_manual: true, stock_actual: 0, alerta_stock_bajo: 5, activo: true, categoria: '' };
+const base = { nombre: '', tipo: 'fresco', precio_costo: 0, precio_venta: 0, porcentaje_ganancia: 0, precio_venta_manual: true, stock_actual: 0, alerta_stock_bajo: 5, activo: true, categoria: '', unidad_uso: '', equivalencia_uso: 0 };
 const defaultElaborado = { ...base, unidad_medida: 'unidad' };
 const defaultBase = { ...base, unidad_medida: 'unidad', alerta_stock_bajo: 1 };
 const defaultMateria = { ...base, unidad_medida: 'kg', alerta_stock_bajo: 1 };
@@ -90,6 +91,7 @@ export default function Productos() {
       porcentaje_ganancia: p.porcentaje_ganancia ?? 0, precio_venta_manual: p.precio_venta_manual,
       stock_actual: p.stock_actual, unidad_medida: p.unidad_medida,
       alerta_stock_bajo: p.alerta_stock_bajo, activo: p.activo, categoria: p.categoria ?? '',
+      unidad_uso: p.unidad_uso ?? '', equivalencia_uso: p.equivalencia_uso ?? 0,
     });
     setOpen(true);
     cargarHistorialPrecio(p.id).then(setHistorialPrecio);
@@ -114,6 +116,8 @@ export default function Productos() {
       categoria: form.categoria || null,
       porcentaje_ganancia: form.precio_venta_manual ? null : form.porcentaje_ganancia,
       precio_venta: esVendible ? form.precio_venta : 0,
+      unidad_uso: esMateria && form.unidad_uso ? form.unidad_uso : null,
+      equivalencia_uso: esMateria && form.unidad_uso && form.equivalencia_uso > 0 ? form.equivalencia_uso : null,
     };
     if (editId) {
       const original = productos.find(p => p.id === editId);
@@ -238,6 +242,7 @@ export default function Productos() {
                     <SelectItem value="unidad">Unidad</SelectItem>
                     <SelectItem value="porción">Porción</SelectItem>
                     <SelectItem value="paquete">Paquete</SelectItem>
+                    <SelectItem value="maple">Maple</SelectItem>
                     <SelectItem value="docena">Docena</SelectItem>
                     <SelectItem value="1/2 docena">Media docena</SelectItem>
                     <SelectItem value="kg">Kg</SelectItem>
@@ -258,6 +263,30 @@ export default function Productos() {
                 </p>
               )}
             </div>
+
+            {esMateria && (
+              <div className="rounded-lg border border-dashed p-3 space-y-2">
+                <Label className="text-xs text-muted-foreground">¿Se usa en otra unidad al cocinar? (opcional)</Label>
+                <div className="grid grid-cols-2 gap-3">
+                  <Select value={form.unidad_uso || 'ninguna'} onValueChange={v => setForm(f => ({ ...f, unidad_uso: v === 'ninguna' ? '' : v }))}>
+                    <SelectTrigger className="h-9"><SelectValue placeholder="Unidad de uso" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ninguna">No, es la misma</SelectItem>
+                      <SelectItem value="unidad">Unidad</SelectItem>
+                      <SelectItem value="g">Gramos</SelectItem>
+                      <SelectItem value="ml">ml</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {form.unidad_uso && (
+                    <Input type="number" step="0.01" placeholder={`${form.unidad_medida} = ? ${form.unidad_uso}`}
+                      value={form.equivalencia_uso || ''} onChange={e => setForm(f => ({ ...f, equivalencia_uso: parseFloat(e.target.value) || 0 }))} className="h-9" />
+                  )}
+                </div>
+                {form.unidad_uso && form.equivalencia_uso > 0 && (
+                  <p className="text-xs text-muted-foreground">1 {form.unidad_medida} = {form.equivalencia_uso} {form.unidad_uso}. Al registrar producción vas a poder anotar cuánto usaste en {form.unidad_uso}.</p>
+                )}
+              </div>
+            )}
 
             {!esMateria && (
               <>
@@ -376,6 +405,7 @@ export default function Productos() {
                 Costo: {formatCurrency(p.precio_costo)}
                 {esVendible && ` · Venta: ${formatCurrency(p.precio_venta)}`}
                 {' · '}Stock: {p.stock_actual} {p.unidad_medida}
+                {p.unidad_uso && p.equivalencia_uso ? ` (1 ${p.unidad_medida} = ${p.equivalencia_uso} ${p.unidad_uso})` : ''}
               </p>
             </div>
             {!selectMode && (

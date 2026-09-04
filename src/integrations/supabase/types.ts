@@ -331,6 +331,7 @@ export type Database = {
           categoria: string | null
           clase: string
           created_at: string
+          equivalencia_uso: number | null
           es_materia_prima: boolean
           id: string
           nombre: string
@@ -341,6 +342,7 @@ export type Database = {
           stock_actual: number
           tipo: string
           unidad_medida: string
+          unidad_uso: string | null
           updated_at: string
           user_id: string
         }
@@ -350,6 +352,7 @@ export type Database = {
           categoria?: string | null
           clase?: string
           created_at?: string
+          equivalencia_uso?: number | null
           es_materia_prima?: boolean
           id?: string
           nombre: string
@@ -360,6 +363,7 @@ export type Database = {
           stock_actual?: number
           tipo: string
           unidad_medida?: string
+          unidad_uso?: string | null
           updated_at?: string
           user_id: string
         }
@@ -369,6 +373,7 @@ export type Database = {
           categoria?: string | null
           clase?: string
           created_at?: string
+          equivalencia_uso?: number | null
           es_materia_prima?: boolean
           id?: string
           nombre?: string
@@ -379,6 +384,7 @@ export type Database = {
           stock_actual?: number
           tipo?: string
           unidad_medida?: string
+          unidad_uso?: string | null
           updated_at?: string
           user_id?: string
         }

@@ -19,8 +19,8 @@ import ActualizarPrecios from '@/components/ActualizarPrecios';
 import { cargarHistorialPrecio, type EntradaHistorial } from '@/lib/precios';
 
 type Clase = 'elaborado' | 'base' | 'materia_prima';
-type Linea = 'congelados' | 'menu_dia' | 'reventa' | 'otros';
-type TabKey = 'congelados' | 'menu_dia' | 'reventa' | 'otros' | 'bases' | 'materia';
+type Linea = 'congelados' | 'menu_dia' | 'reventa' | 'carta_fija';
+type TabKey = 'congelados' | 'menu_dia' | 'reventa' | 'carta_fija' | 'bases' | 'materia';
 
 interface Producto {
   id: string; nombre: string; tipo: string; precio_costo: number; precio_venta: number;
@@ -31,23 +31,23 @@ interface Producto {
 }
 interface Movimiento { id: string; tipo: string; cantidad: number; notas: string | null; created_at: string; productos: { nombre: string } | null; }
 
-const base = { nombre: '', tipo: 'fresco', precio_costo: 0, precio_venta: 0, porcentaje_ganancia: 0, precio_venta_manual: true, stock_actual: 0, alerta_stock_bajo: 5, activo: true, categoria: '', linea: 'otros' as Linea, unidad_uso: '', equivalencia_uso: 0 };
+const base = { nombre: '', tipo: 'fresco', precio_costo: 0, precio_venta: 0, porcentaje_ganancia: 0, precio_venta_manual: true, stock_actual: 0, alerta_stock_bajo: 5, activo: true, categoria: '', linea: 'carta_fija' as Linea, unidad_uso: '', equivalencia_uso: 0 };
 const defaultBase = { ...base, unidad_medida: 'unidad', alerta_stock_bajo: 1 };
 const defaultMateria = { ...base, unidad_medida: 'kg', alerta_stock_bajo: 1 };
 
 interface TabDef { key: TabKey; label: string; clase: Clase; linea?: Linea; singular: string; tipoDefault?: string; }
 const TABS: TabDef[] = [
   { key: 'congelados', label: 'Congelados', clase: 'elaborado', linea: 'congelados', singular: 'congelado', tipoDefault: 'congelado' },
+  { key: 'carta_fija', label: 'Carta fija', clase: 'elaborado', linea: 'carta_fija', singular: 'producto', tipoDefault: 'fresco' },
   { key: 'menu_dia', label: 'Menú día', clase: 'elaborado', linea: 'menu_dia', singular: 'menú', tipoDefault: 'fresco' },
   { key: 'reventa', label: 'Productos', clase: 'elaborado', linea: 'reventa', singular: 'producto', tipoDefault: 'fresco' },
-  { key: 'otros', label: 'Otros', clase: 'elaborado', linea: 'otros', singular: 'producto', tipoDefault: 'fresco' },
   { key: 'bases', label: 'Bases', clase: 'base', singular: 'base' },
   { key: 'materia', label: 'Materia prima', clase: 'materia_prima', singular: 'materia prima' },
 ];
-const LINEA_LABEL: Record<Linea, string> = { congelados: 'Congelados', menu_dia: 'Menú del día', reventa: 'Productos', otros: 'Otros' };
+const LINEA_LABEL: Record<Linea, string> = { congelados: 'Congelados', menu_dia: 'Menú del día', reventa: 'Productos', carta_fija: 'Carta fija' };
 
 function lineaDe(p: Producto): Linea {
-  return (p.linea === 'congelados' || p.linea === 'menu_dia' || p.linea === 'reventa') ? p.linea : 'otros';
+  return (p.linea === 'congelados' || p.linea === 'menu_dia' || p.linea === 'reventa') ? p.linea : 'carta_fija';
 }
 
 function defaultForm(tabKey: TabKey) {
@@ -142,7 +142,7 @@ export default function Productos() {
       clase: claseTab,
       es_materia_prima: claseTab === 'materia_prima',
       categoria: form.categoria || null,
-      linea: esVendible ? (form.linea || 'otros') : 'otros',
+      linea: esVendible ? (form.linea || 'carta_fija') : 'carta_fija',
       porcentaje_ganancia: form.precio_venta_manual ? null : form.porcentaje_ganancia,
       precio_venta: esVendible ? form.precio_venta : 0,
       unidad_uso: esMateria && form.unidad_uso ? form.unidad_uso : null,

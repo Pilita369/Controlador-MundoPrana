@@ -141,11 +141,69 @@ export type Database = {
         }
         Relationships: []
       }
+      deudas: {
+        Row: {
+          activo: boolean
+          ambito: string | null
+          created_at: string
+          cuota_estimada: number | null
+          cuotas_pagadas: number
+          cuotas_totales: number | null
+          estado: string
+          fecha_inicio: string | null
+          id: string
+          monto_total: number | null
+          nombre: string
+          notas: string | null
+          periodicidad: string
+          tipo: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          activo?: boolean
+          ambito?: string | null
+          created_at?: string
+          cuota_estimada?: number | null
+          cuotas_pagadas?: number
+          cuotas_totales?: number | null
+          estado?: string
+          fecha_inicio?: string | null
+          id?: string
+          monto_total?: number | null
+          nombre: string
+          notas?: string | null
+          periodicidad?: string
+          tipo?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          activo?: boolean
+          ambito?: string | null
+          created_at?: string
+          cuota_estimada?: number | null
+          cuotas_pagadas?: number
+          cuotas_totales?: number | null
+          estado?: string
+          fecha_inicio?: string | null
+          id?: string
+          monto_total?: number | null
+          nombre?: string
+          notas?: string | null
+          periodicidad?: string
+          tipo?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       gastos: {
         Row: {
           categoria_id: string | null
           created_at: string
           descripcion: string
+          deuda_id: string | null
           fecha: string
           id: string
           medio_pago: string
@@ -158,6 +216,7 @@ export type Database = {
           categoria_id?: string | null
           created_at?: string
           descripcion: string
+          deuda_id?: string | null
           fecha?: string
           id?: string
           medio_pago: string
@@ -170,6 +229,7 @@ export type Database = {
           categoria_id?: string | null
           created_at?: string
           descripcion?: string
+          deuda_id?: string | null
           fecha?: string
           id?: string
           medio_pago?: string
@@ -184,6 +244,13 @@ export type Database = {
             columns: ["categoria_id"]
             isOneToOne: false
             referencedRelation: "categorias_gasto"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gastos_deuda_id_fkey"
+            columns: ["deuda_id"]
+            isOneToOne: false
+            referencedRelation: "deudas"
             referencedColumns: ["id"]
           },
         ]

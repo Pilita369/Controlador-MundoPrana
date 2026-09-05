@@ -485,6 +485,7 @@ export type Database = {
           equivalencia_uso: number | null
           es_materia_prima: boolean
           id: string
+          linea: string
           nombre: string
           porcentaje_ganancia: number | null
           precio_costo: number
@@ -506,6 +507,7 @@ export type Database = {
           equivalencia_uso?: number | null
           es_materia_prima?: boolean
           id?: string
+          linea?: string
           nombre: string
           porcentaje_ganancia?: number | null
           precio_costo?: number
@@ -527,6 +529,7 @@ export type Database = {
           equivalencia_uso?: number | null
           es_materia_prima?: boolean
           id?: string
+          linea?: string
           nombre?: string
           porcentaje_ganancia?: number | null
           precio_costo?: number

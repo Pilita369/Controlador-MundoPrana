@@ -19,24 +19,43 @@ import ActualizarPrecios from '@/components/ActualizarPrecios';
 import { cargarHistorialPrecio, type EntradaHistorial } from '@/lib/precios';
 
 type Clase = 'elaborado' | 'base' | 'materia_prima';
-type TabKey = 'elaborados' | 'bases' | 'materia';
+type Linea = 'congelados' | 'menu_dia' | 'reventa' | 'otros';
+type TabKey = 'congelados' | 'menu_dia' | 'reventa' | 'otros' | 'bases' | 'materia';
 
 interface Producto {
   id: string; nombre: string; tipo: string; precio_costo: number; precio_venta: number;
   porcentaje_ganancia: number | null; precio_venta_manual: boolean; stock_actual: number;
   unidad_medida: string; alerta_stock_bajo: number; activo: boolean; es_materia_prima: boolean;
-  clase: string | null; categoria: string | null;
+  clase: string | null; categoria: string | null; linea: string | null;
   unidad_uso: string | null; equivalencia_uso: number | null;
 }
 interface Movimiento { id: string; tipo: string; cantidad: number; notas: string | null; created_at: string; productos: { nombre: string } | null; }
 
-const base = { nombre: '', tipo: 'fresco', precio_costo: 0, precio_venta: 0, porcentaje_ganancia: 0, precio_venta_manual: true, stock_actual: 0, alerta_stock_bajo: 5, activo: true, categoria: '', unidad_uso: '', equivalencia_uso: 0 };
-const defaultElaborado = { ...base, unidad_medida: 'unidad' };
+const base = { nombre: '', tipo: 'fresco', precio_costo: 0, precio_venta: 0, porcentaje_ganancia: 0, precio_venta_manual: true, stock_actual: 0, alerta_stock_bajo: 5, activo: true, categoria: '', linea: 'otros' as Linea, unidad_uso: '', equivalencia_uso: 0 };
 const defaultBase = { ...base, unidad_medida: 'unidad', alerta_stock_bajo: 1 };
 const defaultMateria = { ...base, unidad_medida: 'kg', alerta_stock_bajo: 1 };
 
-const TAB_A_CLASE: Record<TabKey, Clase> = { elaborados: 'elaborado', bases: 'base', materia: 'materia_prima' };
-const LABEL_SINGULAR: Record<TabKey, string> = { elaborados: 'producto', bases: 'base', materia: 'materia prima' };
+interface TabDef { key: TabKey; label: string; clase: Clase; linea?: Linea; singular: string; tipoDefault?: string; }
+const TABS: TabDef[] = [
+  { key: 'congelados', label: 'Congelados', clase: 'elaborado', linea: 'congelados', singular: 'congelado', tipoDefault: 'congelado' },
+  { key: 'menu_dia', label: 'Menú día', clase: 'elaborado', linea: 'menu_dia', singular: 'menú', tipoDefault: 'fresco' },
+  { key: 'reventa', label: 'Productos', clase: 'elaborado', linea: 'reventa', singular: 'producto', tipoDefault: 'fresco' },
+  { key: 'otros', label: 'Otros', clase: 'elaborado', linea: 'otros', singular: 'producto', tipoDefault: 'fresco' },
+  { key: 'bases', label: 'Bases', clase: 'base', singular: 'base' },
+  { key: 'materia', label: 'Materia prima', clase: 'materia_prima', singular: 'materia prima' },
+];
+const LINEA_LABEL: Record<Linea, string> = { congelados: 'Congelados', menu_dia: 'Menú del día', reventa: 'Productos', otros: 'Otros' };
+
+function lineaDe(p: Producto): Linea {
+  return (p.linea === 'congelados' || p.linea === 'menu_dia' || p.linea === 'reventa') ? p.linea : 'otros';
+}
+
+function defaultForm(tabKey: TabKey) {
+  const def = TABS.find(t => t.key === tabKey)!;
+  if (def.clase === 'materia_prima') return defaultMateria;
+  if (def.clase === 'base') return defaultBase;
+  return { ...base, unidad_medida: 'unidad', tipo: def.tipoDefault ?? 'fresco', linea: (def.linea ?? 'otros') as Linea };
+}
 
 // Conversiones fijas y conocidas: no tiene sentido pedirle a Pilar que las escriba.
 function equivalenciaFija(unidadMedida: string, unidadUso: string): number | undefined {
@@ -53,11 +72,11 @@ function claseDe(p: Producto): Clase {
 export default function Productos() {
   const { user } = useAuth();
   const [productos, setProductos] = useState<Producto[]>([]);
-  const [tab, setTab] = useState<TabKey>('elaborados');
+  const [tab, setTab] = useState<TabKey>('congelados');
   const [busqueda, setBusqueda] = useState('');
   const [open, setOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
-  const [form, setForm] = useState(defaultElaborado);
+  const [form, setForm] = useState(defaultForm('congelados'));
   const [showHistory, setShowHistory] = useState(false);
   const [movimientos, setMovimientos] = useState<Movimiento[]>([]);
   const [ajusteOpen, setAjusteOpen] = useState(false);
@@ -77,17 +96,19 @@ export default function Productos() {
     setProductos((data as any) ?? []);
   }
 
-  const claseTab = TAB_A_CLASE[tab];
+  const tabDef = TABS.find(t => t.key === tab)!;
+  const claseTab = tabDef.clase;
   const esMateria = tab === 'materia';
-  const esVendible = tab === 'elaborados';
+  const esVendible = tabDef.clase === 'elaborado';
   const listaFiltrada = productos
     .filter(p => claseDe(p) === claseTab)
+    .filter(p => tabDef.linea == null || lineaDe(p) === tabDef.linea)
     .filter(p => p.nombre.toLowerCase().includes(busqueda.toLowerCase()));
 
   function openNew() {
     setEditId(null);
     setHistorialPrecio([]);
-    setForm(esMateria ? defaultMateria : tab === 'bases' ? defaultBase : defaultElaborado);
+    setForm(defaultForm(tab));
     setOpen(true);
   }
 
@@ -98,7 +119,7 @@ export default function Productos() {
       porcentaje_ganancia: p.porcentaje_ganancia ?? 0, precio_venta_manual: p.precio_venta_manual,
       stock_actual: p.stock_actual, unidad_medida: p.unidad_medida,
       alerta_stock_bajo: p.alerta_stock_bajo, activo: p.activo, categoria: p.categoria ?? '',
-      unidad_uso: p.unidad_uso ?? '', equivalencia_uso: p.equivalencia_uso ?? 0,
+      linea: lineaDe(p), unidad_uso: p.unidad_uso ?? '', equivalencia_uso: p.equivalencia_uso ?? 0,
     });
     setOpen(true);
     cargarHistorialPrecio(p.id).then(setHistorialPrecio);
@@ -121,6 +142,7 @@ export default function Productos() {
       clase: claseTab,
       es_materia_prima: claseTab === 'materia_prima',
       categoria: form.categoria || null,
+      linea: esVendible ? (form.linea || 'otros') : 'otros',
       porcentaje_ganancia: form.precio_venta_manual ? null : form.porcentaje_ganancia,
       precio_venta: esVendible ? form.precio_venta : 0,
       unidad_uso: esMateria && form.unidad_uso ? form.unidad_uso : null,
@@ -202,10 +224,10 @@ export default function Productos() {
 
       {/* Pestañas */}
       <Tabs value={tab} onValueChange={v => setTab(v as TabKey)}>
-        <TabsList className="w-full">
-          <TabsTrigger value="elaborados" className="flex-1">Elaborados</TabsTrigger>
-          <TabsTrigger value="bases" className="flex-1">Bases</TabsTrigger>
-          <TabsTrigger value="materia" className="flex-1">Materia prima</TabsTrigger>
+        <TabsList className="grid grid-cols-3 h-auto w-full gap-1">
+          {TABS.map(t => (
+            <TabsTrigger key={t.key} value={t.key} className="text-xs">{t.label}</TabsTrigger>
+          ))}
         </TabsList>
       </Tabs>
 
@@ -213,7 +235,7 @@ export default function Productos() {
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
         <Input
-          placeholder={`Buscar ${LABEL_SINGULAR[tab]}...`}
+          placeholder={`Buscar ${tabDef.singular}...`}
           value={busqueda}
           onChange={e => setBusqueda(e.target.value)}
           className="pl-9"
@@ -236,7 +258,7 @@ export default function Productos() {
       {/* Modal nuevo/editar */}
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-h-[90vh] overflow-y-auto">
-          <DialogHeader><DialogTitle>{editId ? 'Editar' : 'Nuevo'} {LABEL_SINGULAR[tab]}</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{editId ? 'Editar' : 'Nuevo'} {tabDef.singular}</DialogTitle></DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-3">
             <div><Label>Nombre</Label><Input value={form.nombre} onChange={e => setForm(f => ({ ...f, nombre: e.target.value }))} required /></div>
 
@@ -296,6 +318,17 @@ export default function Productos() {
                 {form.unidad_uso && form.equivalencia_uso > 0 && (
                   <p className="text-xs text-muted-foreground">1 {form.unidad_medida} = {form.equivalencia_uso} {form.unidad_uso}. Al registrar producción vas a poder anotar cuánto usaste en {form.unidad_uso}.</p>
                 )}
+              </div>
+            )}
+
+            {esVendible && (
+              <div><Label>Grupo</Label>
+                <Select value={form.linea} onValueChange={v => setForm(f => ({ ...f, linea: v as Linea }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {(Object.keys(LINEA_LABEL) as Linea[]).map(l => <SelectItem key={l} value={l}>{LINEA_LABEL[l]}</SelectItem>)}
+                  </SelectContent>
+                </Select>
               </div>
             )}
 
@@ -430,7 +463,7 @@ export default function Productos() {
         ))}
         {listaFiltrada.length === 0 && (
           <p className="text-muted-foreground text-sm text-center py-8">
-            {busqueda ? 'No se encontraron resultados' : `No hay ${LABEL_SINGULAR[tab]} cargados`}
+            {busqueda ? 'No se encontraron resultados' : `No hay ${tabDef.singular} cargados`}
           </p>
         )}
       </div>

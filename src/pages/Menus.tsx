@@ -295,7 +295,7 @@ export default function Menus() {
                           <div className="flex items-center gap-1.5 flex-wrap">
                             {esMediodia && it.fecha && <span className="text-xs text-muted-foreground w-24 shrink-0">{fechaLabel(it.fecha)}</span>}
                             <span className="truncate">{it.nombre_plato}</span>
-                            {it.categoria && <Badge variant="outline" className="text-xs">{it.categoria === 'carne' ? 'Carne' : 'Veggie'}</Badge>}
+                            {it.categoria && <Badge variant="outline" className="text-xs">{it.categoria === 'carne' ? 'Carne' : it.categoria === 'vegano' ? 'Vegano' : 'Veggie'}</Badge>}
                             {it.precio != null && <span className="text-xs text-muted-foreground">{formatCurrency(it.precio)}</span>}
                           </div>
                         </div>
@@ -336,6 +336,7 @@ export default function Menus() {
                         <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="ninguna">Sin categoría</SelectItem>
+                          <SelectItem value="vegano">Vegano</SelectItem>
                           <SelectItem value="vegetariano">Vegetariano</SelectItem>
                           <SelectItem value="carne">Carne</SelectItem>
                         </SelectContent>

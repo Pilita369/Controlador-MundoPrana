@@ -346,6 +346,7 @@ export default function Productos() {
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="ninguna">Sin categoría</SelectItem>
+                        <SelectItem value="vegano">Vegano</SelectItem>
                         <SelectItem value="vegetariano">Vegetariano</SelectItem>
                         <SelectItem value="carne">Carne</SelectItem>
                       </SelectContent>
@@ -441,7 +442,7 @@ export default function Productos() {
               <div className="flex items-center gap-2 flex-wrap">
                 <p className="font-medium text-sm">{p.nombre}</p>
                 {!esMateria && <Badge variant={p.tipo === 'fresco' ? 'default' : 'secondary'} className="text-xs">{p.tipo}</Badge>}
-                {p.categoria && <Badge variant="outline" className="text-xs">{p.categoria === 'carne' ? 'Carne' : 'Veggie'}</Badge>}
+                {p.categoria && <Badge variant="outline" className="text-xs">{p.categoria === 'carne' ? 'Carne' : p.categoria === 'vegano' ? 'Vegano' : 'Veggie'}</Badge>}
                 {p.stock_actual <= p.alerta_stock_bajo && p.activo && <Badge variant="destructive" className="text-xs"><AlertTriangle className="w-3 h-3 mr-1" />Stock bajo</Badge>}
                 {!p.activo && <Badge variant="outline" className="text-xs">Inactivo</Badge>}
               </div>

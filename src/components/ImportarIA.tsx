@@ -305,6 +305,7 @@ export default function ImportarIA({ target, onDone }: { target: Target; onDone:
                         <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="ninguna">Categoría</SelectItem>
+                          <SelectItem value="vegano">Vegano</SelectItem>
                           <SelectItem value="vegetariano">Vegetariano</SelectItem>
                           <SelectItem value="carne">Carne</SelectItem>
                         </SelectContent>

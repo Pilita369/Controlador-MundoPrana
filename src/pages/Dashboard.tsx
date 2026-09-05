@@ -5,7 +5,7 @@ import { seedInitialData } from '@/hooks/useSeedData';
 import MetricCard from '@/components/MetricCard';
 import { formatCurrency } from '@/lib/format';
 import { Progress } from '@/components/ui/progress';
-import { ShoppingCart, Receipt, TrendingUp, Wallet, Target, CreditCard } from 'lucide-react';
+import { ShoppingCart, Receipt, TrendingUp, Wallet, Target, CreditCard, Calendar } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 
 const COLORS = ['#1D9E75', '#2ab98a', '#45d4a0', '#6eeab8', '#a0f0d0', '#c4f5e0'];
@@ -13,6 +13,7 @@ const COLORS = ['#1D9E75', '#2ab98a', '#45d4a0', '#6eeab8', '#a0f0d0', '#c4f5e0'
 export default function Dashboard() {
   const { user } = useAuth();
   const [ventas, setVentas] = useState(0);
+  const [ingresosMensualidad, setIngresosMensualidad] = useState(0);
   const [gastos, setGastos] = useState(0);
   const [sueldoTotal, setSueldoTotal] = useState(0);
   const [gastosPersonales, setGastosPersonales] = useState(0);
@@ -34,20 +35,25 @@ export default function Dashboard() {
     const startOfMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
     const endOfMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()}`;
 
-    const [ventasRes, gastosNegRes, gastosPerRes, sueldoRes, ajustesRes] = await Promise.all([
+    const [ventasRes, mensualidadRes, gastosNegRes, gastosPerRes, sueldoRes, ajustesRes] = await Promise.all([
       supabase.from('ventas').select('total').eq('user_id', user.id).gte('fecha', startOfMonth).lte('fecha', endOfMonth),
+      supabase.from('pedidos').select('total').eq('user_id', user.id).eq('tipo_ingreso', 'mensualidad').gte('fecha', startOfMonth).lte('fecha', endOfMonth),
       supabase.from('gastos').select('monto, categorias_gasto(nombre)').eq('user_id', user.id).eq('tipo', 'negocio').gte('fecha', startOfMonth).lte('fecha', endOfMonth),
       supabase.from('gastos').select('monto').eq('user_id', user.id).eq('tipo', 'personal').gte('fecha', startOfMonth).lte('fecha', endOfMonth),
       supabase.from('sueldo_retiros').select('monto').eq('user_id', user.id).gte('fecha', startOfMonth).lte('fecha', endOfMonth),
       supabase.from('ajustes_usuario').select('meta_sueldo_mensual').eq('user_id', user.id).single(),
     ]);
 
+    // "ventas" son las esporádicas (ya pasan por la tabla ventas, item por item).
+    // La mensualidad es un ingreso cobrado por adelantado, no genera filas en ventas.
     const totalVentas = ventasRes.data?.reduce((s, v) => s + Number(v.total), 0) ?? 0;
+    const totalMensualidad = mensualidadRes.data?.reduce((s, p) => s + Number(p.total), 0) ?? 0;
     const totalGastos = gastosNegRes.data?.reduce((s, g) => s + Number(g.monto), 0) ?? 0;
     const totalGastosPersonales = gastosPerRes.data?.reduce((s, g) => s + Number(g.monto), 0) ?? 0;
     const totalSueldo = sueldoRes.data?.reduce((s, r) => s + Number(r.monto), 0) ?? 0;
 
     setVentas(totalVentas);
+    setIngresosMensualidad(totalMensualidad);
     setGastos(totalGastos);
     setGastosPersonales(totalGastosPersonales);
     setSueldoTotal(totalSueldo);
@@ -67,14 +73,16 @@ export default function Dashboard() {
       const end = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate()}`;
       const mesLabel = d.toLocaleDateString('es-AR', { month: 'short' });
 
-      const [v, g] = await Promise.all([
+      const [v, m, g] = await Promise.all([
         supabase.from('ventas').select('total').eq('user_id', user!.id).gte('fecha', start).lte('fecha', end),
+        supabase.from('pedidos').select('total').eq('user_id', user!.id).eq('tipo_ingreso', 'mensualidad').gte('fecha', start).lte('fecha', end),
         supabase.from('gastos').select('monto').eq('user_id', user!.id).eq('tipo', 'negocio').gte('fecha', start).lte('fecha', end),
       ]);
 
+      // el grafico de tendencia muestra el ingreso total (esporadico + mensualidad)
       monthData.push({
         mes: mesLabel,
-        ventas: v.data?.reduce((s, x) => s + Number(x.total), 0) ?? 0,
+        ventas: (v.data?.reduce((s, x) => s + Number(x.total), 0) ?? 0) + (m.data?.reduce((s, x) => s + Number(x.total), 0) ?? 0),
         gastos: g.data?.reduce((s, x) => s + Number(x.monto), 0) ?? 0,
       });
     }
@@ -91,7 +99,7 @@ export default function Dashboard() {
     );
   }
 
-  const balance = ventas - gastos;
+  const balance = ventas + ingresosMensualidad - gastos;
   const balancePersonal = sueldoTotal - gastosPersonales;
   const progreso = meta > 0 ? Math.min((sueldoTotal / meta) * 100, 100) : 0;
 
@@ -111,8 +119,9 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <MetricCard title="Ventas" value={formatCurrency(ventas)} icon={<ShoppingCart className="w-4 h-4" />} />
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+        <MetricCard title="Ventas esporádicas" value={formatCurrency(ventas)} icon={<ShoppingCart className="w-4 h-4" />} />
+        <MetricCard title="Mensualidad" value={formatCurrency(ingresosMensualidad)} icon={<Calendar className="w-4 h-4" />} />
         <MetricCard title="Gastos negocio" value={formatCurrency(gastos)} icon={<Receipt className="w-4 h-4" />} />
         <MetricCard title="Balance negocio" value={formatCurrency(balance)} icon={<TrendingUp className="w-4 h-4" />} />
         <MetricCard title="Mi sueldo" value={formatCurrency(sueldoTotal)} icon={<Wallet className="w-4 h-4" />} />

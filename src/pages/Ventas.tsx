@@ -8,12 +8,18 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Label } from '@/components/ui/label';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Badge } from '@/components/ui/badge';
 import { Plus, Download, Search, Trash2, Edit2, X, User, Tag } from 'lucide-react';
 import { toast } from 'sonner';
+import { normalizarNombre } from '@/lib/importParser';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
+type TipoIngreso = 'esporadico' | 'mensualidad';
+
 interface Producto { id: string; nombre: string; precio_venta: number; stock_actual: number; }
+interface Cliente { id: string; nombre: string; es_mensual: boolean; monto_mensual: number | null; }
 
 interface ItemLinea {
   producto_id: string;
@@ -35,6 +41,9 @@ interface Pedido {
   id: string;
   fecha: string;
   cliente: string | null;
+  cliente_id: string | null;
+  tipo_ingreso: string;
+  mes_mensualidad: string | null;
   medio_cobro: string;
   subtotal: number;
   descuento_monto: number;
@@ -61,9 +70,15 @@ type EntradaLista =
 
 // ─── Form ─────────────────────────────────────────────────────────────────────
 
+const mesActual = () => new Date().toISOString().slice(0, 7);
+
 const emptyForm = {
+  tipo_ingreso: 'esporadico' as TipoIngreso,
   fecha: new Date().toISOString().split('T')[0],
   cliente: '',
+  cliente_id: '',
+  mes_mensualidad: mesActual(),
+  monto_mensualidad: 0,
   medio_cobro: 'efectivo',
   descuento_tipo: 'porcentaje' as 'porcentaje' | 'monto',
   descuento_valor: 0,
@@ -91,6 +106,8 @@ export default function Ventas() {
   const [pedidos, setPedidos] = useState<Pedido[]>([]);
   const [legacyVentas, setLegacyVentas] = useState<VentaLegacy[]>([]);
   const [productos, setProductos] = useState<Producto[]>([]);
+  const [clientes, setClientes] = useState<Cliente[]>([]);
+  const [buscarCliente, setBuscarCliente] = useState('');
   const [open, setOpen] = useState(false);
   const [editPedidoId, setEditPedidoId] = useState<string | null>(null);
   const [editLegacyId, setEditLegacyId] = useState<string | null>(null);
@@ -106,7 +123,7 @@ export default function Ventas() {
   });
   const [buscarLegacy, setBuscarLegacy] = useState('');
 
-  useEffect(() => { if (user) { load(); loadProductos(); } }, [user]);
+  useEffect(() => { if (user) { load(); loadProductos(); loadClientes(); } }, [user]);
 
   async function load() {
     const [pedidosRes, ventasConPedidoRes, legacyRes] = await Promise.all([
@@ -149,6 +166,27 @@ export default function Ventas() {
     if (data) setProductos((data as unknown as Producto[]) ?? []);
   }
 
+  async function loadClientes() {
+    const { data } = await supabase.from('clientes').select('id, nombre, es_mensual, monto_mensual').eq('user_id', user!.id).eq('activo', true).order('nombre');
+    setClientes((data as Cliente[]) ?? []);
+  }
+
+  async function crearYSeleccionarCliente() {
+    const nombre = buscarCliente.trim();
+    if (!nombre) return;
+    const { data, error } = await supabase.from('clientes').insert({
+      user_id: user!.id, nombre, es_mensual: true, monto_mensual: form.monto_mensualidad || null,
+    }).select('id, nombre, es_mensual, monto_mensual').single();
+    if (error) { toast.error(error.message); return; }
+    setClientes(cs => [...cs, data as Cliente]);
+    seleccionarCliente(data as Cliente);
+  }
+
+  function seleccionarCliente(c: Cliente) {
+    setForm(f => ({ ...f, cliente_id: c.id, cliente: c.nombre, monto_mensualidad: c.monto_mensual ?? f.monto_mensualidad }));
+    setBuscarCliente('');
+  }
+
   // ── Agregar item al formulario ───────────────────────────────────────────────
 
   function agregarItem(prod: Producto) {
@@ -186,6 +224,7 @@ export default function Ventas() {
     setEditLegacyId(null);
     setForm(emptyForm);
     setBuscarProducto('');
+    setBuscarCliente('');
     setOpen(true);
   }
 
@@ -194,20 +233,36 @@ export default function Ventas() {
   function openEditPedido(p: Pedido) {
     setEditPedidoId(p.id);
     setEditLegacyId(null);
-    setForm({
-      fecha: p.fecha,
-      cliente: p.cliente ?? '',
-      medio_cobro: p.medio_cobro,
-      descuento_tipo: p.descuento_porcentaje > 0 ? 'porcentaje' : 'monto',
-      descuento_valor: p.descuento_porcentaje > 0 ? p.descuento_porcentaje : p.descuento_monto,
-      items: p.items.map(i => ({
-        producto_id: i.producto_id,
-        nombre: i.productos?.nombre ?? '',
-        cantidad: i.cantidad,
-        precio_unitario: Number(i.precio_unitario),
-      })),
-    });
+    if (p.tipo_ingreso === 'mensualidad') {
+      setForm({
+        ...emptyForm,
+        tipo_ingreso: 'mensualidad',
+        fecha: p.fecha,
+        cliente: p.cliente ?? '',
+        cliente_id: p.cliente_id ?? '',
+        mes_mensualidad: p.mes_mensualidad ? p.mes_mensualidad.slice(0, 7) : mesActual(),
+        monto_mensualidad: Number(p.total),
+        medio_cobro: p.medio_cobro,
+      });
+    } else {
+      setForm({
+        ...emptyForm,
+        tipo_ingreso: 'esporadico',
+        fecha: p.fecha,
+        cliente: p.cliente ?? '',
+        medio_cobro: p.medio_cobro,
+        descuento_tipo: p.descuento_porcentaje > 0 ? 'porcentaje' : 'monto',
+        descuento_valor: p.descuento_porcentaje > 0 ? p.descuento_porcentaje : p.descuento_monto,
+        items: p.items.map(i => ({
+          producto_id: i.producto_id,
+          nombre: i.productos?.nombre ?? '',
+          cantidad: i.cantidad,
+          precio_unitario: Number(i.precio_unitario),
+        })),
+      });
+    }
     setBuscarProducto('');
+    setBuscarCliente('');
     setOpen(true);
   }
 
@@ -229,8 +284,38 @@ export default function Ventas() {
 
   // ── Guardar pedido (nuevo o edición) ─────────────────────────────────────────
 
+  async function handleSubmitMensualidad() {
+    if (!form.cliente.trim()) { toast.error('Elegí o creá el cliente'); return; }
+    if (!form.monto_mensualidad || form.monto_mensualidad <= 0) { toast.error('Ingresá el monto de la mensualidad'); return; }
+    const payload = {
+      fecha: form.fecha,
+      cliente: form.cliente,
+      cliente_id: form.cliente_id || null,
+      medio_cobro: form.medio_cobro,
+      tipo_ingreso: 'mensualidad',
+      mes_mensualidad: form.mes_mensualidad ? `${form.mes_mensualidad}-01` : null,
+      subtotal: form.monto_mensualidad,
+      descuento_monto: 0,
+      descuento_porcentaje: 0,
+      total: form.monto_mensualidad,
+    };
+    if (editPedidoId) {
+      const { error } = await supabase.from('pedidos').update(payload).eq('id', editPedidoId);
+      if (error) { toast.error(error.message); return; }
+      toast.success('Mensualidad actualizada');
+    } else {
+      const { error } = await supabase.from('pedidos').insert({ ...payload, user_id: user!.id });
+      if (error) { toast.error(error.message); return; }
+      toast.success('Mensualidad registrada');
+    }
+    setOpen(false);
+    setForm(emptyForm);
+    load();
+  }
+
   async function handleSubmitPedido(e: React.FormEvent) {
     e.preventDefault();
+    if (form.tipo_ingreso === 'mensualidad') { await handleSubmitMensualidad(); return; }
     if (form.items.length === 0) { toast.error('Agregá al menos un producto'); return; }
 
     const { subtotal, descuento_monto, descuento_porcentaje, total } = calcTotales(
@@ -258,6 +343,9 @@ export default function Ventas() {
           fecha: form.fecha,
           cliente: form.cliente || null,
           medio_cobro: form.medio_cobro,
+          tipo_ingreso: 'esporadico',
+          cliente_id: null,
+          mes_mensualidad: null,
           subtotal,
           descuento_monto,
           descuento_porcentaje,
@@ -391,6 +479,10 @@ export default function Ventas() {
   });
 
   const totalGeneral = entradasFiltradas.reduce((s, e) => s + Number(e.data.total), 0);
+  const totalMensualidad = entradasFiltradas
+    .filter(e => e.tipo === 'pedido' && e.data.tipo_ingreso === 'mensualidad')
+    .reduce((s, e) => s + Number(e.data.total), 0);
+  const totalEsporadico = totalGeneral - totalMensualidad;
   const byMedio: Record<string, number> = {};
   entradasFiltradas.forEach(e => {
     const medio = e.data.medio_cobro;
@@ -411,7 +503,7 @@ export default function Ventas() {
       </div>
 
       {/* ── Modal ────────────────────────────────────────────────────────────── */}
-      <Dialog open={open} onOpenChange={v => { setOpen(v); if (!v) { setEditPedidoId(null); setEditLegacyId(null); setBuscarProducto(''); } }}>
+      <Dialog open={open} onOpenChange={v => { setOpen(v); if (!v) { setEditPedidoId(null); setEditLegacyId(null); setBuscarProducto(''); setBuscarCliente(''); } }}>
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
@@ -468,6 +560,56 @@ export default function Ventas() {
           ) : (
             /* Formulario pedido (nuevo o edición de pedido) */
             <form onSubmit={handleSubmitPedido} className="space-y-4">
+              {/* Esporádica vs Mensualidad */}
+              <Tabs value={form.tipo_ingreso} onValueChange={v => setForm(f => ({ ...f, tipo_ingreso: v as TipoIngreso }))}>
+                <TabsList className="w-full">
+                  <TabsTrigger value="esporadico" className="flex-1">Esporádica</TabsTrigger>
+                  <TabsTrigger value="mensualidad" className="flex-1">Mensualidad</TabsTrigger>
+                </TabsList>
+              </Tabs>
+
+              {form.tipo_ingreso === 'mensualidad' ? (
+                <div className="space-y-3">
+                  <div className="space-y-1">
+                    <Label>Cliente mensualizado</Label>
+                    {form.cliente_id || form.cliente ? (
+                      <div className="flex items-center justify-between border rounded-md px-3 py-2 text-sm">
+                        <span className="font-medium">{form.cliente}</span>
+                        <button type="button" className="text-xs text-muted-foreground hover:text-foreground" onClick={() => setForm(f => ({ ...f, cliente_id: '', cliente: '' }))}>Cambiar</button>
+                      </div>
+                    ) : (
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                        <Input placeholder="Buscar o escribir nombre..." value={buscarCliente}
+                          onChange={e => setBuscarCliente(e.target.value)}
+                          className="pl-9" />
+                        {buscarCliente && (
+                          <div className="border rounded-md bg-card shadow-sm max-h-40 overflow-y-auto mt-1">
+                            {clientes.filter(c => c.nombre.toLowerCase().includes(buscarCliente.toLowerCase())).map(c => (
+                              <button key={c.id} type="button" className="w-full text-left px-3 py-2 text-sm hover:bg-muted flex justify-between"
+                                onClick={() => seleccionarCliente(c)}>
+                                <span>{c.nombre}</span>
+                                {c.monto_mensual != null && <span className="text-xs text-muted-foreground">{formatCurrency(c.monto_mensual)}</span>}
+                              </button>
+                            ))}
+                            {!clientes.some(c => normalizarNombre(c.nombre) === normalizarNombre(buscarCliente)) && (
+                              <button type="button" className="w-full text-left px-3 py-2 text-sm hover:bg-muted text-primary" onClick={crearYSeleccionarCliente}>
+                                + Crear cliente "{buscarCliente}"
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div><Label>Mes</Label><Input type="month" value={form.mes_mensualidad} onChange={e => setForm(f => ({ ...f, mes_mensualidad: e.target.value }))} /></div>
+                    <div><Label>Monto</Label><Input type="number" step="0.01" value={form.monto_mensualidad || ''} onChange={e => setForm(f => ({ ...f, monto_mensualidad: parseFloat(e.target.value) || 0 }))} /></div>
+                  </div>
+                  <div><Label>Fecha de pago</Label><Input type="date" value={form.fecha} onChange={e => setForm(f => ({ ...f, fecha: e.target.value }))} /></div>
+                </div>
+              ) : (
+              <>
               {/* Fila fecha + cliente */}
               <div className="grid grid-cols-2 gap-3">
                 <div><Label>Fecha</Label><Input type="date" value={form.fecha} onChange={e => setForm(f => ({ ...f, fecha: e.target.value }))} /></div>
@@ -577,6 +719,8 @@ export default function Ventas() {
                   )}
                 </div>
               )}
+              </>
+              )}
 
               {/* Medio de cobro */}
               <div>
@@ -592,7 +736,13 @@ export default function Ventas() {
               </div>
 
               {/* Totales */}
-              {form.items.length > 0 && (
+              {form.tipo_ingreso === 'mensualidad' ? (
+                form.monto_mensualidad > 0 && (
+                  <div className="bg-muted/50 rounded-lg p-3 flex justify-between font-semibold text-base">
+                    <span>MENSUALIDAD</span><span className="text-primary">{formatCurrency(form.monto_mensualidad)}</span>
+                  </div>
+                )
+              ) : form.items.length > 0 && (
                 <div className="bg-muted/50 rounded-lg p-3 space-y-1 text-sm">
                   <div className="flex justify-between text-muted-foreground">
                     <span>Subtotal</span><span>{formatCurrency(formSubtotal)}</span>
@@ -608,8 +758,8 @@ export default function Ventas() {
                 </div>
               )}
 
-              <Button type="submit" className="w-full" disabled={form.items.length === 0}>
-                {editPedidoId ? 'Guardar cambios' : 'Registrar venta'}
+              <Button type="submit" className="w-full" disabled={form.tipo_ingreso === 'mensualidad' ? !form.cliente.trim() || form.monto_mensualidad <= 0 : form.items.length === 0}>
+                {editPedidoId ? 'Guardar cambios' : form.tipo_ingreso === 'mensualidad' ? 'Registrar mensualidad' : 'Registrar venta'}
               </Button>
             </form>
           )}
@@ -638,6 +788,19 @@ export default function Ventas() {
         </div>
         <Button variant="outline" size="sm" onClick={() => {
           const rows = entradasFiltradas.flatMap(e => {
+            if (e.tipo === 'pedido' && e.data.tipo_ingreso === 'mensualidad') {
+              return [{
+                Fecha: e.data.fecha,
+                Cliente: e.data.cliente ?? '',
+                Producto: `Mensualidad ${e.data.mes_mensualidad?.slice(0, 7) ?? ''}`,
+                Cantidad: 1,
+                'Precio Unit': e.data.total,
+                'Total Item': e.data.total,
+                'Total Pedido': e.data.total,
+                Descuento: 0,
+                Medio: e.data.medio_cobro,
+              }];
+            }
             if (e.tipo === 'pedido') {
               return e.data.items.map(i => ({
                 Fecha: e.data.fecha,
@@ -662,6 +825,8 @@ export default function Ventas() {
       {/* ── Resumen ──────────────────────────────────────────────────────────── */}
       <div className="bg-card rounded-lg border p-3 flex flex-wrap gap-4 text-sm">
         <span className="font-medium">Total: {formatCurrency(totalGeneral)}</span>
+        <span className="text-muted-foreground">Esporádicas: {formatCurrency(totalEsporadico)}</span>
+        {totalMensualidad > 0 && <span className="text-muted-foreground">Mensualidad: {formatCurrency(totalMensualidad)}</span>}
         {Object.entries(byMedio).map(([k, v]) => (
           <span key={k} className="text-muted-foreground">{k}: {formatCurrency(v)}</span>
         ))}
@@ -672,6 +837,7 @@ export default function Ventas() {
         {entradasFiltradas.map(entrada => {
           if (entrada.tipo === 'pedido') {
             const p = entrada.data;
+            const esMensualidad = p.tipo_ingreso === 'mensualidad';
             const tieneDescuento = p.descuento_monto > 0;
             return (
               <div key={`pedido-${p.id}`} className="bg-card rounded-lg border p-3 space-y-2">
@@ -685,16 +851,20 @@ export default function Ventas() {
                       )}
                       <span className="text-xs text-muted-foreground">{formatDate(p.fecha)}</span>
                       <span className="text-xs text-muted-foreground">· {p.medio_cobro}</span>
-                      {p.items.length > 1 && (
-                        <span className="text-xs bg-muted px-1.5 py-0.5 rounded">{p.items.length} productos</span>
-                      )}
+                      {esMensualidad
+                        ? <Badge variant="secondary" className="text-xs">Mensualidad{p.mes_mensualidad ? ` · ${p.mes_mensualidad.slice(0, 7)}` : ''}</Badge>
+                        : p.items.length > 1 && (
+                          <span className="text-xs bg-muted px-1.5 py-0.5 rounded">{p.items.length} productos</span>
+                        )}
                     </div>
                     {/* Items en línea */}
-                    <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
-                      {p.items.map(i => `${i.productos?.nombre ?? '?'} ×${i.cantidad}`).join(' · ')}
-                    </p>
+                    {!esMensualidad && (
+                      <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                        {p.items.map(i => `${i.productos?.nombre ?? '?'} ×${i.cantidad}`).join(' · ')}
+                      </p>
+                    )}
                     {/* Descuento */}
-                    {tieneDescuento && (
+                    {!esMensualidad && tieneDescuento && (
                       <p className="text-xs text-muted-foreground mt-0.5">
                         Subtotal {formatCurrency(p.subtotal)}
                         {' · '}

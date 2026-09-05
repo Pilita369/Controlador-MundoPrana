@@ -68,6 +68,42 @@ export type Database = {
         }
         Relationships: []
       }
+      clientes: {
+        Row: {
+          activo: boolean
+          created_at: string
+          es_mensual: boolean
+          id: string
+          monto_mensual: number | null
+          nombre: string
+          notas: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          activo?: boolean
+          created_at?: string
+          es_mensual?: boolean
+          id?: string
+          monto_mensual?: number | null
+          nombre: string
+          notas?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          activo?: boolean
+          created_at?: string
+          es_mensual?: boolean
+          id?: string
+          monto_mensual?: number | null
+          nombre?: string
+          notas?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       gastos: {
         Row: {
           categoria_id: string | null
@@ -247,44 +283,61 @@ export type Database = {
       pedidos: {
         Row: {
           cliente: string | null
+          cliente_id: string | null
           created_at: string
           descuento_monto: number
           descuento_porcentaje: number
           fecha: string
           id: string
           medio_cobro: string
+          mes_mensualidad: string | null
           notas: string | null
           subtotal: number
+          tipo_ingreso: string
           total: number
           user_id: string
         }
         Insert: {
           cliente?: string | null
+          cliente_id?: string | null
           created_at?: string
           descuento_monto?: number
           descuento_porcentaje?: number
           fecha?: string
           id?: string
           medio_cobro?: string
+          mes_mensualidad?: string | null
           notas?: string | null
           subtotal?: number
+          tipo_ingreso?: string
           total?: number
           user_id: string
         }
         Update: {
           cliente?: string | null
+          cliente_id?: string | null
           created_at?: string
           descuento_monto?: number
           descuento_porcentaje?: number
           fecha?: string
           id?: string
           medio_cobro?: string
+          mes_mensualidad?: string | null
           notas?: string | null
           subtotal?: number
+          tipo_ingreso?: string
           total?: number
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "pedidos_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       precios_historial: {
         Row: {

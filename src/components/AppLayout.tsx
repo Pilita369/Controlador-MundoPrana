@@ -1,6 +1,6 @@
 import { ReactNode, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Home, ShoppingCart, Receipt, Wallet, Package, CalendarDays, ChefHat, Settings, LogOut, Menu as MenuIcon } from 'lucide-react';
+import { Home, ShoppingCart, Receipt, Wallet, Package, CalendarDays, ChefHat, Calculator, Settings, LogOut, Menu as MenuIcon } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { cn } from '@/lib/utils';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
@@ -11,6 +11,7 @@ const navItems = [
   { path: '/ventas', label: 'Ventas', icon: ShoppingCart },
   { path: '/productos', label: 'Productos', icon: Package },
   { path: '/produccion', label: 'Producción', icon: ChefHat },
+  { path: '/costos', label: 'Costos', icon: Calculator },
   { path: '/menus', label: 'Menús', icon: CalendarDays },
   { path: '/gastos', label: 'Gastos', icon: Receipt },
   { path: '/sueldo', label: 'Mi Sueldo', icon: Wallet },

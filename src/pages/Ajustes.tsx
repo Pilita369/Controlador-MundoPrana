@@ -9,6 +9,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Separator } from '@/components/ui/separator';
 import { Trash2, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
+import { cargarConfigCostos, guardarConfigCostos, CONFIG_COSTOS_DEFAULT, type ConfigCostos } from '@/lib/costos';
 
 type SeccionBorrar = 'ventas' | 'gastos_negocio' | 'gastos_personal' | 'sueldo' | null;
 
@@ -25,12 +26,14 @@ export default function Ajustes() {
   const [meta, setMeta] = useState(300000);
   const [confirmBorrar, setConfirmBorrar] = useState<SeccionBorrar>(null);
   const [loading, setLoading] = useState(false);
+  const [cfg, setCfg] = useState<ConfigCostos>(CONFIG_COSTOS_DEFAULT);
 
   useEffect(() => {
     if (!user) return;
     supabase.from('ajustes_usuario').select('*').eq('user_id', user.id).single().then(({ data }) => {
       if (data) { setNombre(data.nombre_negocio); setMeta(data.meta_sueldo_mensual); }
     });
+    cargarConfigCostos(user.id).then(setCfg);
   }, [user]);
 
   async function save() {
@@ -38,6 +41,17 @@ export default function Ajustes() {
     if (error) { toast.error(error.message); return; }
     toast.success('Ajustes guardados');
   }
+
+  async function saveCostos() {
+    try {
+      await guardarConfigCostos(user!.id, cfg);
+      toast.success('Configuración de costos guardada');
+    } catch (e: any) {
+      toast.error(e?.message ?? 'Error al guardar');
+    }
+  }
+  const setC = (k: keyof ConfigCostos, v: string) =>
+    setCfg(c => ({ ...c, [k]: k === 'costo_energia_mensual' ? (v ? parseFloat(v) : null) : (parseFloat(v) || 0) }));
 
   async function handleBorrar() {
     if (!confirmBorrar || !user) return;
@@ -84,6 +98,41 @@ export default function Ajustes() {
             <p>Formato fecha: DD/MM/AAAA</p>
           </div>
           <Button onClick={save}>Guardar cambios</Button>
+        </CardContent>
+      </Card>
+
+      {/* Costos */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Costos</CardTitle>
+          <p className="text-sm text-muted-foreground">Se usa para calcular el costo y el margen de cada producto en la sección Costos.</p>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label>Condimentos y menores (%)</Label>
+              <Input type="number" step="0.5" value={cfg.menores_pct} onChange={e => setC('menores_pct', e.target.value)} />
+              <p className="text-xs text-muted-foreground mt-1">Se suma al costo de ingredientes.</p>
+            </div>
+            <div>
+              <Label>Costo productivo de respaldo (%)</Label>
+              <Input type="number" step="1" value={cfg.fallback_productivo_pct} onChange={e => setC('fallback_productivo_pct', e.target.value)} />
+              <p className="text-xs text-muted-foreground mt-1">% del costo directo cuando un producto no tiene minutos cargados.</p>
+            </div>
+            <div>
+              <Label>Precio hora de mano de obra (ARS)</Label>
+              <Input type="number" step="100" value={cfg.precio_hora_mano_obra} onChange={e => setC('precio_hora_mano_obra', e.target.value)} />
+            </div>
+            <div>
+              <Label>Gas + luz productivos por mes (ARS)</Label>
+              <Input type="number" step="1000" value={cfg.costo_energia_mensual ?? ''} onChange={e => setC('costo_energia_mensual', e.target.value)} placeholder="opcional" />
+            </div>
+            <div>
+              <Label>Markup para precio sugerido (%)</Label>
+              <Input type="number" step="5" value={cfg.markup_default} onChange={e => setC('markup_default', e.target.value)} />
+            </div>
+          </div>
+          <Button onClick={saveCostos}>Guardar costos</Button>
         </CardContent>
       </Card>
 

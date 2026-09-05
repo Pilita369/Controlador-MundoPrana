@@ -28,10 +28,11 @@ interface Producto {
   unidad_medida: string; alerta_stock_bajo: number; activo: boolean; es_materia_prima: boolean;
   clase: string | null; categoria: string | null; linea: string | null;
   unidad_uso: string | null; equivalencia_uso: number | null;
+  minutos_por_unidad: number | null; costo_packaging: number | null;
 }
 interface Movimiento { id: string; tipo: string; cantidad: number; notas: string | null; created_at: string; productos: { nombre: string } | null; }
 
-const base = { nombre: '', tipo: 'fresco', precio_costo: 0, precio_venta: 0, porcentaje_ganancia: 0, precio_venta_manual: true, stock_actual: 0, alerta_stock_bajo: 5, activo: true, categoria: '', linea: 'carta_fija' as Linea, unidad_uso: '', equivalencia_uso: 0 };
+const base = { nombre: '', tipo: 'fresco', precio_costo: 0, precio_venta: 0, porcentaje_ganancia: 0, precio_venta_manual: true, stock_actual: 0, alerta_stock_bajo: 5, activo: true, categoria: '', linea: 'carta_fija' as Linea, unidad_uso: '', equivalencia_uso: 0, minutos_por_unidad: '', costo_packaging: '' };
 const defaultBase = { ...base, unidad_medida: 'unidad', alerta_stock_bajo: 1 };
 const defaultMateria = { ...base, unidad_medida: 'kg', alerta_stock_bajo: 1 };
 
@@ -120,6 +121,8 @@ export default function Productos() {
       stock_actual: p.stock_actual, unidad_medida: p.unidad_medida,
       alerta_stock_bajo: p.alerta_stock_bajo, activo: p.activo, categoria: p.categoria ?? '',
       linea: lineaDe(p), unidad_uso: p.unidad_uso ?? '', equivalencia_uso: p.equivalencia_uso ?? 0,
+      minutos_por_unidad: p.minutos_por_unidad != null ? String(p.minutos_por_unidad) : '',
+      costo_packaging: p.costo_packaging != null ? String(p.costo_packaging) : '',
     });
     setOpen(true);
     cargarHistorialPrecio(p.id).then(setHistorialPrecio);
@@ -147,6 +150,8 @@ export default function Productos() {
       precio_venta: esVendible ? form.precio_venta : 0,
       unidad_uso: esMateria && form.unidad_uso ? form.unidad_uso : null,
       equivalencia_uso: esMateria && form.unidad_uso && form.equivalencia_uso > 0 ? form.equivalencia_uso : null,
+      minutos_por_unidad: esVendible && form.minutos_por_unidad ? parseFloat(form.minutos_por_unidad) : null,
+      costo_packaging: esVendible && form.costo_packaging ? parseFloat(form.costo_packaging) : null,
     };
     if (editId) {
       const original = productos.find(p => p.id === editId);
@@ -368,6 +373,11 @@ export default function Productos() {
                   </div>
                 </div>
                 {!form.precio_venta_manual && <div><Label>% Ganancia</Label><Input type="number" step="0.1" value={form.porcentaje_ganancia} onChange={e => setForm(f => ({ ...f, porcentaje_ganancia: parseFloat(e.target.value) || 0 }))} /></div>}
+                <div className="grid grid-cols-2 gap-3">
+                  <div><Label className="text-xs">Minutos por unidad</Label><Input type="number" step="0.5" value={form.minutos_por_unidad} onChange={e => setForm(f => ({ ...f, minutos_por_unidad: e.target.value }))} placeholder="opcional" /></div>
+                  <div><Label className="text-xs">Packaging por unidad</Label><Input type="number" step="0.01" value={form.costo_packaging} onChange={e => setForm(f => ({ ...f, costo_packaging: e.target.value }))} placeholder="opcional" /></div>
+                </div>
+                <p className="text-xs text-muted-foreground -mt-1">Para el cálculo de costos. Los minutos (horno + preparación) reemplazan el % de respaldo.</p>
               </>
             )}
 

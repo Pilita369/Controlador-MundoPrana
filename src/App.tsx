@@ -13,6 +13,7 @@ import Sueldo from "@/pages/Sueldo";
 import Productos from "@/pages/Productos";
 import Menus from "@/pages/Menus";
 import Produccion from "@/pages/Produccion";
+import Costos from "@/pages/Costos";
 import Ajustes from "@/pages/Ajustes";
 import NotFound from "@/pages/NotFound";
 
@@ -48,6 +49,7 @@ const App = () => (
             <Route path="/productos" element={<ProtectedRoute><Productos /></ProtectedRoute>} />
             <Route path="/menus" element={<ProtectedRoute><Menus /></ProtectedRoute>} />
             <Route path="/produccion" element={<ProtectedRoute><Produccion /></ProtectedRoute>} />
+            <Route path="/costos" element={<ProtectedRoute><Costos /></ProtectedRoute>} />
             <Route path="/ajustes" element={<ProtectedRoute><Ajustes /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>

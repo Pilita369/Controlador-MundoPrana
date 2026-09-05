@@ -7,8 +7,6 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instantiate createClient with right options
-  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
@@ -99,6 +97,45 @@ export type Database = {
           monto_mensual?: number | null
           nombre?: string
           notas?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      config_costos: {
+        Row: {
+          costo_energia_mensual: number | null
+          created_at: string
+          fallback_productivo_pct: number
+          id: string
+          markup_default: number
+          menores_pct: number
+          minutos_mes: number
+          precio_hora_mano_obra: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          costo_energia_mensual?: number | null
+          created_at?: string
+          fallback_productivo_pct?: number
+          id?: string
+          markup_default?: number
+          menores_pct?: number
+          minutos_mes?: number
+          precio_hora_mano_obra?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          costo_energia_mensual?: number | null
+          created_at?: string
+          fallback_productivo_pct?: number
+          id?: string
+          markup_default?: number
+          menores_pct?: number
+          minutos_mes?: number
+          precio_hora_mano_obra?: number
           updated_at?: string
           user_id?: string
         }
@@ -481,11 +518,13 @@ export type Database = {
           alerta_stock_bajo: number
           categoria: string | null
           clase: string
+          costo_packaging: number | null
           created_at: string
           equivalencia_uso: number | null
           es_materia_prima: boolean
           id: string
           linea: string
+          minutos_por_unidad: number | null
           nombre: string
           porcentaje_ganancia: number | null
           precio_costo: number
@@ -503,11 +542,13 @@ export type Database = {
           alerta_stock_bajo?: number
           categoria?: string | null
           clase?: string
+          costo_packaging?: number | null
           created_at?: string
           equivalencia_uso?: number | null
           es_materia_prima?: boolean
           id?: string
           linea?: string
+          minutos_por_unidad?: number | null
           nombre: string
           porcentaje_ganancia?: number | null
           precio_costo?: number
@@ -525,11 +566,13 @@ export type Database = {
           alerta_stock_bajo?: number
           categoria?: string | null
           clase?: string
+          costo_packaging?: number | null
           created_at?: string
           equivalencia_uso?: number | null
           es_materia_prima?: boolean
           id?: string
           linea?: string
+          minutos_por_unidad?: number | null
           nombre?: string
           porcentaje_ganancia?: number | null
           precio_costo?: number

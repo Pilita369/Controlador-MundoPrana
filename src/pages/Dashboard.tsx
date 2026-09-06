@@ -5,13 +5,18 @@ import { seedInitialData } from '@/hooks/useSeedData';
 import MetricCard from '@/components/MetricCard';
 import { formatCurrency } from '@/lib/format';
 import { Progress } from '@/components/ui/progress';
-import { ShoppingCart, Receipt, TrendingUp, Wallet, Target, CreditCard, Calendar } from 'lucide-react';
+import { ShoppingCart, Receipt, TrendingUp, Wallet, Target, CreditCard, Calendar, AlertTriangle } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import { useNavigate } from 'react-router-dom';
 
 const COLORS = ['#1D9E75', '#2ab98a', '#45d4a0', '#6eeab8', '#a0f0d0', '#c4f5e0'];
 
+interface StockBajo { id: string; nombre: string; stock_actual: number; alerta_stock_bajo: number; unidad_medida: string; }
+
 export default function Dashboard() {
   const { user } = useAuth();
+  const navigate = useNavigate();
+  const [stockBajo, setStockBajo] = useState<StockBajo[]>([]);
   const [ventas, setVentas] = useState(0);
   const [ingresosMensualidad, setIngresosMensualidad] = useState(0);
   const [gastos, setGastos] = useState(0);
@@ -58,6 +63,11 @@ export default function Dashboard() {
     setGastosPersonales(totalGastosPersonales);
     setSueldoTotal(totalSueldo);
     setMeta(ajustesRes.data?.meta_sueldo_mensual ?? 300000);
+
+    const { data: prodStock } = await supabase.from('productos')
+      .select('id, nombre, stock_actual, alerta_stock_bajo, unidad_medida')
+      .match({ user_id: user.id, activo: true }).gt('alerta_stock_bajo', 0);
+    setStockBajo(((prodStock as any[]) ?? []).filter(p => Number(p.stock_actual) <= Number(p.alerta_stock_bajo)));
 
     const catMap: Record<string, number> = {};
     gastosNegRes.data?.forEach((g: any) => {
@@ -118,6 +128,24 @@ export default function Dashboard() {
           <p className="text-muted-foreground text-sm">Inicio</p>
         </div>
       </div>
+
+      {stockBajo.length > 0 && (
+        <button onClick={() => navigate('/productos')} className="w-full text-left bg-destructive/5 border border-destructive/40 rounded-lg p-3">
+          <div className="flex items-center gap-2 text-destructive font-medium text-sm">
+            <AlertTriangle className="w-4 h-4" />
+            Reponer pronto ({stockBajo.length})
+          </div>
+          <div className="mt-1.5 space-y-0.5">
+            {stockBajo.slice(0, 6).map(p => (
+              <div key={p.id} className="flex justify-between text-xs text-muted-foreground">
+                <span>{p.nombre}</span>
+                <span>queda {p.stock_actual} {p.unidad_medida} (aviso: {p.alerta_stock_bajo})</span>
+              </div>
+            ))}
+            {stockBajo.length > 6 && <p className="text-xs text-muted-foreground">y {stockBajo.length - 6} más...</p>}
+          </div>
+        </button>
+      )}
 
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
         <MetricCard title="Ventas esporádicas" value={formatCurrency(ventas)} icon={<ShoppingCart className="w-4 h-4" />} />

@@ -420,7 +420,11 @@ export default function Productos() {
               </>
             )}
 
-            <div><Label>Alerta stock bajo</Label><Input type="number" step="0.1" value={form.alerta_stock_bajo} onChange={e => setForm(f => ({ ...f, alerta_stock_bajo: parseFloat(e.target.value) || 0 }))} /></div>
+            <div>
+              <Label>Alerta stock bajo</Label>
+              <Input type="number" step="0.01" value={form.alerta_stock_bajo} onChange={e => setForm(f => ({ ...f, alerta_stock_bajo: parseFloat(e.target.value) || 0 }))} />
+              <p className="text-xs text-muted-foreground mt-1">Te avisa en Inicio cuando el stock baja a este valor{esMateria ? '. Ej: 1 (última bolsa), 0,25 (¼ de cajón), 2 (2 maples)' : ''}. Poné 0 para no avisar.</p>
+            </div>
             <div className="flex items-center gap-2"><Switch checked={form.activo} onCheckedChange={v => setForm(f => ({ ...f, activo: v }))} /><Label>Activo</Label></div>
             <Button type="submit" className="w-full">{editId ? 'Guardar' : 'Crear'}</Button>
           </form>
@@ -492,7 +496,7 @@ export default function Productos() {
                 <p className="font-medium text-sm">{p.nombre}</p>
                 {!esMateria && <Badge variant={p.tipo === 'fresco' ? 'default' : 'secondary'} className="text-xs">{p.tipo}</Badge>}
                 {p.categoria && <Badge variant="outline" className="text-xs">{p.categoria === 'carne' ? 'Carne' : p.categoria === 'vegano' ? 'Vegano' : 'Veggie'}</Badge>}
-                {p.stock_actual <= p.alerta_stock_bajo && p.activo && <Badge variant="destructive" className="text-xs"><AlertTriangle className="w-3 h-3 mr-1" />Stock bajo</Badge>}
+                {p.alerta_stock_bajo > 0 && p.stock_actual <= p.alerta_stock_bajo && p.activo && <Badge variant="destructive" className="text-xs"><AlertTriangle className="w-3 h-3 mr-1" />Stock bajo</Badge>}
                 {!p.activo && <Badge variant="outline" className="text-xs">Inactivo</Badge>}
               </div>
               <p className="text-xs text-muted-foreground mt-0.5">

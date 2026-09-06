@@ -102,6 +102,63 @@ export type Database = {
         }
         Relationships: []
       }
+      compras: {
+        Row: {
+          cantidad: number
+          created_at: string
+          fecha: string
+          gasto_id: string | null
+          id: string
+          notas: string | null
+          precio_total: number
+          precio_unitario: number
+          producto_id: string
+          proveedor: string | null
+          user_id: string
+        }
+        Insert: {
+          cantidad: number
+          created_at?: string
+          fecha?: string
+          gasto_id?: string | null
+          id?: string
+          notas?: string | null
+          precio_total: number
+          precio_unitario: number
+          producto_id: string
+          proveedor?: string | null
+          user_id: string
+        }
+        Update: {
+          cantidad?: number
+          created_at?: string
+          fecha?: string
+          gasto_id?: string | null
+          id?: string
+          notas?: string | null
+          precio_total?: number
+          precio_unitario?: number
+          producto_id?: string
+          proveedor?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "compras_gasto_id_fkey"
+            columns: ["gasto_id"]
+            isOneToOne: false
+            referencedRelation: "gastos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "compras_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "productos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       config_costos: {
         Row: {
           costo_energia_mensual: number | null

@@ -16,7 +16,9 @@ import { Plus, Edit2, AlertTriangle, History, Trash2, Search } from 'lucide-reac
 import { toast } from 'sonner';
 import ImportarIA from '@/components/ImportarIA';
 import ActualizarPrecios from '@/components/ActualizarPrecios';
+import RegistrarCompra from '@/components/RegistrarCompra';
 import { cargarHistorialPrecio, type EntradaHistorial } from '@/lib/precios';
+import { cargarCompras, type CompraResumen } from '@/lib/compras';
 
 type Clase = 'elaborado' | 'base' | 'materia_prima';
 type Linea = 'congelados' | 'menu_dia' | 'reventa' | 'carta_fija';
@@ -88,6 +90,7 @@ export default function Productos() {
   const [deleteMultiConfirm, setDeleteMultiConfirm] = useState(false);
   const [deleteSingleId, setDeleteSingleId] = useState<string | null>(null);
   const [historialPrecio, setHistorialPrecio] = useState<EntradaHistorial[]>([]);
+  const [historialCompras, setHistorialCompras] = useState<CompraResumen[]>([]);
   const [filtroCat, setFiltroCat] = useState('');
 
   useEffect(() => { if (user) load(); }, [user]);
@@ -130,6 +133,8 @@ export default function Productos() {
     });
     setOpen(true);
     cargarHistorialPrecio(p.id).then(setHistorialPrecio);
+    setHistorialCompras([]);
+    if (claseDe(p) === 'materia_prima') cargarCompras(p.id).then(setHistorialCompras);
   }
 
   function calcPrecioSugerido() {
@@ -213,15 +218,16 @@ export default function Productos() {
     else setSelected(new Set(listaFiltrada.map(p => p.id)));
   }
 
-  const tipoLabel: Record<string, string> = { produccion: 'Producción', venta: 'Venta', retiro_duena: 'Retiro dueña', ajuste: 'Ajuste', perdida: 'Pérdida', consumo_interno: 'Consumo interno', otro: 'Otro' };
+  const tipoLabel: Record<string, string> = { produccion: 'Producción', venta: 'Venta', retiro_duena: 'Retiro dueña', ajuste: 'Ajuste', perdida: 'Pérdida', consumo_interno: 'Consumo interno', otro: 'Otro', compra: 'Compra' };
 
   return (
     <div className="space-y-4 animate-fade-in">
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <h1 className="text-2xl font-bold">Productos</h1>
         <div className="flex gap-2 flex-wrap">
-          <ImportarIA target="productos" onDone={load} />
-          <ActualizarPrecios onDone={load} />
+          {esMateria
+            ? <RegistrarCompra onDone={load} />
+            : <><ImportarIA target="productos" onDone={load} /><ActualizarPrecios onDone={load} /></>}
           <Button variant="outline" size="sm" onClick={loadHistory}><History className="w-4 h-4 mr-1" /> Historial</Button>
           {!selectMode
             ? <Button variant="outline" size="sm" onClick={() => setSelectMode(true)}><Trash2 className="w-4 h-4 mr-1" /> Seleccionar</Button>
@@ -316,6 +322,20 @@ export default function Productos() {
                 </p>
               )}
             </div>
+
+            {esMateria && editId && historialCompras.length > 0 && (
+              <div className="rounded-lg border p-3">
+                <Label className="text-xs text-muted-foreground">Últimas compras</Label>
+                <div className="mt-1 space-y-1">
+                  {historialCompras.map(c => (
+                    <div key={c.id} className="flex justify-between text-xs">
+                      <span>{formatDate(c.fecha)} · {c.cantidad} {form.unidad_medida}{c.proveedor ? ` · ${c.proveedor}` : ''}</span>
+                      <span className="text-muted-foreground">{formatCurrency(c.precio_unitario)}/u · {formatCurrency(c.precio_total)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {esMateria && (
               <div className="rounded-lg border border-dashed p-3 space-y-2">

@@ -240,7 +240,6 @@ export default function ImportarIA({ target, onDone }: { target: Target; onDone:
               <TabsList className="w-full">
                 <TabsTrigger value="texto" className="flex-1">Pegar texto</TabsTrigger>
                 <TabsTrigger value="csv" className="flex-1">CSV</TabsTrigger>
-                <TabsTrigger value="imagen" className="flex-1">Foto/PDF</TabsTrigger>
               </TabsList>
               <TabsContent value="texto" className="space-y-2">
                 <Textarea
@@ -260,18 +259,10 @@ export default function ImportarIA({ target, onDone }: { target: Target; onDone:
                 <p className="text-xs text-muted-foreground">Desde Excel o Google Sheets: Archivo → Descargar → CSV. Se reconocen columnas Nombre, Precio, Tipo, Categoría{target === 'menu' ? ', Fecha' : ''}.</p>
                 <Button className="w-full" onClick={interpretar} disabled={!texto.trim() || (target === 'menu' && !menuId)}>Interpretar</Button>
               </TabsContent>
-              <TabsContent value="imagen" className="space-y-2">
-                <input ref={imagenRef} type="file" accept="image/*,.pdf" hidden onChange={onImagen} disabled={target === 'menu' && !menuId} />
-                <Button type="button" variant="outline" className="w-full" onClick={() => imagenRef.current?.click()} disabled={analizando || (target === 'menu' && !menuId)}>
-                  {analizando
-                    ? <><Loader2 className="w-4 h-4 mr-1 animate-spin" /> Analizando...</>
-                    : <><Camera className="w-4 h-4 mr-1" /> {archivoNombre || 'Subir foto o PDF'}</>}
-                </Button>
-                <p className="text-xs text-muted-foreground">Subí una foto de la carta o un PDF. La IA identifica los productos; después revisás y confirmás antes de guardar.</p>
-              </TabsContent>
-
               <div className="flex items-center gap-2 pt-1 opacity-60">
-                <Badge variant="outline" className="gap-1"><Mic className="w-3 h-3" /> Voz — próximamente</Badge>
+                <Badge variant="outline" className="gap-1"><Camera className="w-3 h-3" /> Foto/PDF</Badge>
+                <Badge variant="outline" className="gap-1"><Mic className="w-3 h-3" /> Voz</Badge>
+                <span className="text-xs text-muted-foreground">próximamente</span>
               </div>
             </Tabs>
           ) : (

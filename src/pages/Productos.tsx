@@ -88,9 +88,10 @@ export default function Productos() {
   const [deleteMultiConfirm, setDeleteMultiConfirm] = useState(false);
   const [deleteSingleId, setDeleteSingleId] = useState<string | null>(null);
   const [historialPrecio, setHistorialPrecio] = useState<EntradaHistorial[]>([]);
+  const [filtroCat, setFiltroCat] = useState('');
 
   useEffect(() => { if (user) load(); }, [user]);
-  useEffect(() => { setBusqueda(''); setSelected(new Set()); setSelectMode(false); }, [tab]);
+  useEffect(() => { setBusqueda(''); setSelected(new Set()); setSelectMode(false); setFiltroCat(''); }, [tab]);
 
   async function load() {
     const { data } = await supabase.from('productos').select('*').eq('user_id', user!.id).order('nombre');
@@ -101,9 +102,12 @@ export default function Productos() {
   const claseTab = tabDef.clase;
   const esMateria = tab === 'materia';
   const esVendible = tabDef.clase === 'elaborado';
-  const listaFiltrada = productos
+  const enTab = productos
     .filter(p => claseDe(p) === claseTab)
-    .filter(p => tabDef.linea == null || lineaDe(p) === tabDef.linea)
+    .filter(p => tabDef.linea == null || lineaDe(p) === tabDef.linea);
+  const catsPresentes = ['carne', 'vegetariano', 'vegano'].filter(c => enTab.some(p => p.categoria === c));
+  const listaFiltrada = enTab
+    .filter(p => !filtroCat || p.categoria === filtroCat)
     .filter(p => p.nombre.toLowerCase().includes(busqueda.toLowerCase()));
 
   function openNew() {
@@ -246,6 +250,21 @@ export default function Productos() {
           className="pl-9"
         />
       </div>
+
+      {/* Filtro por categoría (carne / vegetariano / vegano) */}
+      {esVendible && catsPresentes.length > 1 && (
+        <div className="flex gap-2 flex-wrap">
+          {[{ v: '', l: 'Todas' }, ...catsPresentes.map(c => ({ v: c, l: c === 'carne' ? 'Carne' : c === 'vegano' ? 'Vegano' : 'Vegetariano' }))].map(o => (
+            <button
+              key={o.v}
+              onClick={() => setFiltroCat(o.v)}
+              className={`px-3 py-1 rounded-full text-xs border transition-colors ${filtroCat === o.v ? 'bg-primary text-primary-foreground border-primary' : 'text-muted-foreground hover:bg-accent'}`}
+            >
+              {o.l}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Barra selección múltiple */}
       {selectMode && (

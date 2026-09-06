@@ -11,7 +11,10 @@ import { useNavigate } from 'react-router-dom';
 
 const COLORS = ['#1D9E75', '#2ab98a', '#45d4a0', '#6eeab8', '#a0f0d0', '#c4f5e0'];
 
-interface StockBajo { id: string; nombre: string; stock_actual: number; alerta_stock_bajo: number; unidad_medida: string; }
+interface StockBajo { id: string; nombre: string; stock_actual: number; alerta_stock_bajo: number; unidad_medida: string; rubro: string | null; clase: string; }
+
+const RUBRO_LABEL: Record<string, string> = { carnes: 'Carnes', verduras: 'Verduras', lacteos: 'Lácteos', granel: 'A granel', otros: 'Otros' };
+const grupoDe = (p: StockBajo) => p.clase === 'materia_prima' ? (RUBRO_LABEL[p.rubro ?? ''] ?? 'Sin rubro') : 'Elaborados';
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -65,7 +68,7 @@ export default function Dashboard() {
     setMeta(ajustesRes.data?.meta_sueldo_mensual ?? 300000);
 
     const { data: prodStock } = await supabase.from('productos')
-      .select('id, nombre, stock_actual, alerta_stock_bajo, unidad_medida')
+      .select('id, nombre, stock_actual, alerta_stock_bajo, unidad_medida, rubro, clase')
       .match({ user_id: user.id, activo: true }).gt('alerta_stock_bajo', 0);
     setStockBajo(((prodStock as any[]) ?? []).filter(p => Number(p.stock_actual) <= Number(p.alerta_stock_bajo)));
 
@@ -135,14 +138,22 @@ export default function Dashboard() {
             <AlertTriangle className="w-4 h-4" />
             Reponer pronto ({stockBajo.length})
           </div>
-          <div className="mt-1.5 space-y-0.5">
-            {stockBajo.slice(0, 6).map(p => (
-              <div key={p.id} className="flex justify-between text-xs text-muted-foreground">
-                <span>{p.nombre}</span>
-                <span>queda {p.stock_actual} {p.unidad_medida} (aviso: {p.alerta_stock_bajo})</span>
+          <div className="mt-2 space-y-2">
+            {Object.entries(
+              stockBajo.reduce<Record<string, StockBajo[]>>((acc, p) => {
+                const g = grupoDe(p); (acc[g] ??= []).push(p); return acc;
+              }, {}),
+            ).map(([grupo, items]) => (
+              <div key={grupo}>
+                <p className="text-xs font-medium">{grupo}</p>
+                {items.map(p => (
+                  <div key={p.id} className="flex justify-between text-xs text-muted-foreground pl-2">
+                    <span>{p.nombre}</span>
+                    <span>queda {p.stock_actual} {p.unidad_medida} (aviso: {p.alerta_stock_bajo})</span>
+                  </div>
+                ))}
               </div>
             ))}
-            {stockBajo.length > 6 && <p className="text-xs text-muted-foreground">y {stockBajo.length - 6} más...</p>}
           </div>
         </button>
       )}

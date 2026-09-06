@@ -28,13 +28,15 @@ interface Producto {
   id: string; nombre: string; tipo: string; precio_costo: number; precio_venta: number;
   porcentaje_ganancia: number | null; precio_venta_manual: boolean; stock_actual: number;
   unidad_medida: string; alerta_stock_bajo: number; activo: boolean; es_materia_prima: boolean;
-  clase: string | null; categoria: string | null; linea: string | null;
+  clase: string | null; categoria: string | null; linea: string | null; rubro: string | null;
   unidad_uso: string | null; equivalencia_uso: number | null;
   minutos_por_unidad: number | null; costo_packaging: number | null;
 }
+
+const RUBRO_LABEL: Record<string, string> = { carnes: 'Carnes', verduras: 'Verduras', lacteos: 'Lácteos', granel: 'A granel', otros: 'Otros' };
 interface Movimiento { id: string; tipo: string; cantidad: number; notas: string | null; created_at: string; productos: { nombre: string } | null; }
 
-const base = { nombre: '', tipo: 'fresco', precio_costo: 0, precio_venta: 0, porcentaje_ganancia: 0, precio_venta_manual: true, stock_actual: 0, alerta_stock_bajo: 5, activo: true, categoria: '', linea: 'carta_fija' as Linea, unidad_uso: '', equivalencia_uso: 0, minutos_por_unidad: '', costo_packaging: '' };
+const base = { nombre: '', tipo: 'fresco', precio_costo: 0, precio_venta: 0, porcentaje_ganancia: 0, precio_venta_manual: true, stock_actual: 0, alerta_stock_bajo: 5, activo: true, categoria: '', linea: 'carta_fija' as Linea, rubro: '', unidad_uso: '', equivalencia_uso: 0, minutos_por_unidad: '', costo_packaging: '' };
 const defaultBase = { ...base, unidad_medida: 'unidad', alerta_stock_bajo: 1 };
 const defaultMateria = { ...base, unidad_medida: 'kg', alerta_stock_bajo: 1 };
 
@@ -108,9 +110,11 @@ export default function Productos() {
   const enTab = productos
     .filter(p => claseDe(p) === claseTab)
     .filter(p => tabDef.linea == null || lineaDe(p) === tabDef.linea);
-  const catsPresentes = ['carne', 'vegetariano', 'vegano'].filter(c => enTab.some(p => p.categoria === c));
+  const chips = esMateria
+    ? ['carnes', 'verduras', 'lacteos', 'granel', 'otros'].filter(r => enTab.some(p => p.rubro === r)).map(r => ({ v: r, l: RUBRO_LABEL[r] }))
+    : ['carne', 'vegetariano', 'vegano'].filter(c => enTab.some(p => p.categoria === c)).map(c => ({ v: c, l: c === 'carne' ? 'Carne' : c === 'vegano' ? 'Vegano' : 'Vegetariano' }));
   const listaFiltrada = enTab
-    .filter(p => !filtroCat || p.categoria === filtroCat)
+    .filter(p => !filtroCat || (esMateria ? p.rubro === filtroCat : p.categoria === filtroCat))
     .filter(p => p.nombre.toLowerCase().includes(busqueda.toLowerCase()));
 
   function openNew() {
@@ -127,7 +131,7 @@ export default function Productos() {
       porcentaje_ganancia: p.porcentaje_ganancia ?? 0, precio_venta_manual: p.precio_venta_manual,
       stock_actual: p.stock_actual, unidad_medida: p.unidad_medida,
       alerta_stock_bajo: p.alerta_stock_bajo, activo: p.activo, categoria: p.categoria ?? '',
-      linea: lineaDe(p), unidad_uso: p.unidad_uso ?? '', equivalencia_uso: p.equivalencia_uso ?? 0,
+      linea: lineaDe(p), rubro: p.rubro ?? '', unidad_uso: p.unidad_uso ?? '', equivalencia_uso: p.equivalencia_uso ?? 0,
       minutos_por_unidad: p.minutos_por_unidad != null ? String(p.minutos_por_unidad) : '',
       costo_packaging: p.costo_packaging != null ? String(p.costo_packaging) : '',
     });
@@ -161,6 +165,7 @@ export default function Productos() {
       equivalencia_uso: esMateria && form.unidad_uso && form.equivalencia_uso > 0 ? form.equivalencia_uso : null,
       minutos_por_unidad: esVendible && form.minutos_por_unidad ? parseFloat(form.minutos_por_unidad) : null,
       costo_packaging: esVendible && form.costo_packaging ? parseFloat(form.costo_packaging) : null,
+      rubro: esMateria && form.rubro ? form.rubro : null,
     };
     if (editId) {
       const original = productos.find(p => p.id === editId);
@@ -257,10 +262,10 @@ export default function Productos() {
         />
       </div>
 
-      {/* Filtro por categoría (carne / vegetariano / vegano) */}
-      {esVendible && catsPresentes.length > 1 && (
+      {/* Filtro por categoría (elaborados) o rubro (materia prima) */}
+      {chips.length > 1 && (
         <div className="flex gap-2 flex-wrap">
-          {[{ v: '', l: 'Todas' }, ...catsPresentes.map(c => ({ v: c, l: c === 'carne' ? 'Carne' : c === 'vegano' ? 'Vegano' : 'Vegetariano' }))].map(o => (
+          {[{ v: '', l: 'Todos' }, ...chips].map(o => (
             <button
               key={o.v}
               onClick={() => setFiltroCat(o.v)}
@@ -312,6 +317,18 @@ export default function Productos() {
                 </Select>
               </div>
             </div>
+
+            {esMateria && (
+              <div><Label>Rubro</Label>
+                <Select value={form.rubro || 'sin'} onValueChange={v => setForm(f => ({ ...f, rubro: v === 'sin' ? '' : v }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="sin">Sin rubro</SelectItem>
+                    {Object.entries(RUBRO_LABEL).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
 
             <div>
               <Label>Precio de costo</Label>

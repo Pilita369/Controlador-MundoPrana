@@ -654,6 +654,7 @@ export type Database = {
           precio_costo: number
           precio_venta: number
           precio_venta_manual: boolean
+          rubro: string | null
           stock_actual: number
           tipo: string
           unidad_medida: string
@@ -675,6 +676,7 @@ export type Database = {
           minutos_por_unidad?: number | null
           nombre: string
           porcentaje_ganancia?: number | null
+          rubro?: string | null
           precio_costo?: number
           precio_venta?: number
           precio_venta_manual?: boolean
@@ -702,6 +704,7 @@ export type Database = {
           precio_costo?: number
           precio_venta?: number
           precio_venta_manual?: boolean
+          rubro?: string | null
           stock_actual?: number
           tipo?: string
           unidad_medida?: string

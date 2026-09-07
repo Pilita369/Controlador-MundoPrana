@@ -201,7 +201,7 @@ export default function Dashboard() {
         </div>
       )}
 
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
         <MetricCard title="Ventas esporádicas" value={formatCurrency(ventas)} icon={<ShoppingCart className="w-4 h-4" />} />
         <MetricCard title="Mensualidad" value={formatCurrency(ingresosMensualidad)} icon={<Calendar className="w-4 h-4" />} />
         <MetricCard title="Gastos negocio" value={formatCurrency(gastos)} icon={<Receipt className="w-4 h-4" />} />

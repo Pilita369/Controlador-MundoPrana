@@ -157,17 +157,22 @@ export default function Dashboard() {
             {alertaAbierta ? <ChevronDown className="w-4 h-4 ml-auto" /> : <ChevronRight className="w-4 h-4 ml-auto" />}
           </button>
           {alertaAbierta && (
-            <div className="px-3 pb-3 space-y-3">
+            <div className="px-3 pb-3 space-y-4">
               {materiaBaja.length > 0 && (
                 <div className="space-y-2">
-                  <p className="text-xs font-semibold">Reponer materia prima</p>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-destructive">Reponer materia prima</p>
                   {Object.entries(materiaPorRubro).map(([grupo, items]) => (
-                    <div key={grupo}>
+                    <div key={grupo} className="space-y-1.5">
                       <p className="text-xs font-medium text-muted-foreground">{grupo}</p>
                       {items.map(p => (
-                        <div key={p.id} className="flex justify-between text-xs text-muted-foreground pl-2">
-                          <span>{p.nombre}</span>
-                          <span>queda {p.stock_actual} {p.unidad_medida} (aviso: {p.alerta_stock_bajo})</span>
+                        <div key={p.id} className="flex items-center justify-between gap-3 rounded-md border-2 border-destructive/60 bg-destructive/5 px-3 py-2">
+                          <span className="text-sm font-medium">{p.nombre}</span>
+                          <div className="flex flex-col items-end shrink-0 leading-none">
+                            <span className="text-lg font-bold tabular-nums text-amber-500 dark:text-amber-400">
+                              {p.stock_actual} {p.unidad_medida}
+                            </span>
+                            <span className="text-[10px] text-muted-foreground mt-0.5">aviso: {p.alerta_stock_bajo}</span>
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -175,7 +180,20 @@ export default function Dashboard() {
                 </div>
               )}
               {congeladosBajos.length > 0 && (
-                <p className="text-xs">{congeladosBajos.length} congelados con stock bajo.</p>
+                <div className="space-y-1.5">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-destructive">Congelados con stock bajo</p>
+                  {congeladosBajos.map(p => (
+                    <div key={p.id} className="flex items-center justify-between gap-3 rounded-md border-2 border-destructive/60 bg-destructive/5 px-3 py-2">
+                      <span className="text-sm font-medium">{p.nombre}</span>
+                      <div className="flex flex-col items-end shrink-0 leading-none">
+                        <span className="text-lg font-bold tabular-nums text-amber-500 dark:text-amber-400">
+                          {p.stock_actual} {p.unidad_medida}
+                        </span>
+                        <span className="text-[10px] text-muted-foreground mt-0.5">aviso: {p.alerta_stock_bajo}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               )}
               <button onClick={() => navigate('/productos')} className="text-xs text-primary font-medium">Ir a Productos →</button>
             </div>

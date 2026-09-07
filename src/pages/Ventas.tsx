@@ -19,7 +19,7 @@ import { normalizarNombre } from '@/lib/importParser';
 
 type TipoIngreso = 'esporadico' | 'mensualidad';
 
-interface Producto { id: string; nombre: string; precio_venta: number; stock_actual: number; }
+interface Producto { id: string; nombre: string; precio_venta: number; stock_actual: number; alerta_stock_bajo: number; }
 interface Cliente { id: string; nombre: string; es_mensual: boolean; monto_mensual: number | null; notas: string | null; }
 
 interface ItemLinea {
@@ -164,7 +164,7 @@ export default function Ventas() {
 
   async function loadProductos() {
     const { data } = await supabase.from('productos')
-      .select('id, nombre, precio_venta, stock_actual')
+      .select('id, nombre, precio_venta, stock_actual, alerta_stock_bajo')
       .match({ user_id: user!.id, activo: true, clase: 'elaborado' });
     if (data) setProductos((data as unknown as Producto[]) ?? []);
   }
@@ -668,14 +668,24 @@ export default function Ventas() {
                 </div>
                 {buscarProducto && productosFiltrados.length > 0 && (
                   <div className="border rounded-md bg-card shadow-sm max-h-40 overflow-y-auto">
-                    {productosFiltrados.map(p => (
-                      <button key={p.id} type="button"
-                        className="w-full text-left px-3 py-2 text-sm hover:bg-muted flex justify-between items-center"
-                        onClick={() => agregarItem(p)}>
-                        <span className="font-medium">{p.nombre}</span>
-                        <span className="text-xs text-muted-foreground">stock: {p.stock_actual} · {formatCurrency(p.precio_venta)}</span>
-                      </button>
-                    ))}
+                    {productosFiltrados.map(p => {
+                      const bajo = p.alerta_stock_bajo > 0 && p.stock_actual <= p.alerta_stock_bajo;
+                      return (
+                        <button key={p.id} type="button"
+                          className={`w-full text-left px-3 py-2 text-sm hover:bg-muted flex justify-between items-center gap-2 ${bajo ? 'border-l-2 border-destructive' : ''}`}
+                          onClick={() => agregarItem(p)}>
+                          <span className="font-medium">{p.nombre}</span>
+                          <span className="shrink-0 flex items-baseline gap-1.5">
+                            <span className={bajo
+                              ? 'text-sm font-bold tabular-nums text-amber-500 dark:text-amber-400'
+                              : 'text-xs text-muted-foreground'}>
+                              stock: {p.stock_actual}
+                            </span>
+                            <span className="text-xs text-muted-foreground">· {formatCurrency(p.precio_venta)}</span>
+                          </span>
+                        </button>
+                      );
+                    })}
                   </div>
                 )}
                 {buscarProducto && productosFiltrados.length === 0 && (

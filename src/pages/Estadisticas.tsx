@@ -135,9 +135,9 @@ export default function Estadisticas() {
               <h3 className="text-sm font-medium mb-3">Ventas por categoría</h3>
               <ResponsiveContainer width="100%" height={160}>
                 <BarChart data={porCategoria} layout="vertical" margin={{ left: 10 }}>
-                  <XAxis type="number" tickFormatter={v => `${(v / 1000).toFixed(0)}k`} fontSize={11} />
-                  <YAxis type="category" dataKey="nombre" width={80} fontSize={12} />
-                  <Tooltip formatter={(v: number) => formatCurrency(v)} />
+                  <XAxis type="number" tickFormatter={v => `${(v / 1000).toFixed(0)}k`} fontSize={11} tick={{ fill: 'hsl(var(--muted-foreground))' }} />
+                  <YAxis type="category" dataKey="nombre" width={80} fontSize={12} tick={{ fill: 'hsl(var(--muted-foreground))' }} />
+                  <Tooltip contentStyle={{ background: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))', borderRadius: 8 }} formatter={(v: number) => formatCurrency(v)} />
                   <Bar dataKey="total" radius={[0, 4, 4, 0]}>
                     {porCategoria.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
                   </Bar>
@@ -151,9 +151,9 @@ export default function Estadisticas() {
               <h3 className="text-sm font-medium mb-3">Ventas por línea</h3>
               <ResponsiveContainer width="100%" height={160}>
                 <BarChart data={porLinea} layout="vertical" margin={{ left: 10 }}>
-                  <XAxis type="number" tickFormatter={v => `${(v / 1000).toFixed(0)}k`} fontSize={11} />
-                  <YAxis type="category" dataKey="nombre" width={90} fontSize={12} />
-                  <Tooltip formatter={(v: number) => formatCurrency(v)} />
+                  <XAxis type="number" tickFormatter={v => `${(v / 1000).toFixed(0)}k`} fontSize={11} tick={{ fill: 'hsl(var(--muted-foreground))' }} />
+                  <YAxis type="category" dataKey="nombre" width={90} fontSize={12} tick={{ fill: 'hsl(var(--muted-foreground))' }} />
+                  <Tooltip contentStyle={{ background: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))', borderRadius: 8 }} formatter={(v: number) => formatCurrency(v)} />
                   <Bar dataKey="total" fill="#1D9E75" radius={[0, 4, 4, 0]} />
                 </BarChart>
               </ResponsiveContainer>
@@ -168,7 +168,7 @@ export default function Estadisticas() {
               </div>
               <div>
                 <h3 className="text-sm font-medium mb-1">A revisar (margen más bajo)</h3>
-                {peores.map(m => <div key={m.nombre} className="flex justify-between text-sm"><span className="truncate">{m.nombre}</span><span className={`shrink-0 ml-2 ${(m.pct as number) < 20 ? 'text-destructive' : 'text-amber-600'}`}>{(m.pct as number).toFixed(0)}%</span></div>)}
+                {peores.map(m => <div key={m.nombre} className="flex justify-between text-sm"><span className="truncate">{m.nombre}</span><span className={`shrink-0 ml-2 ${(m.pct as number) < 20 ? 'text-destructive' : 'text-amber-500'}`}>{(m.pct as number).toFixed(0)}%</span></div>)}
               </div>
             </section>
           )}

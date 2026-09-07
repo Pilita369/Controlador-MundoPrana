@@ -5,11 +5,12 @@ import { seedInitialData } from '@/hooks/useSeedData';
 import MetricCard from '@/components/MetricCard';
 import { formatCurrency } from '@/lib/format';
 import { Progress } from '@/components/ui/progress';
-import { ShoppingCart, Receipt, TrendingUp, Wallet, Target, CreditCard, Calendar, AlertTriangle } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import { ShoppingCart, Receipt, TrendingUp, Wallet, Target, CreditCard, Calendar, AlertTriangle, ChevronDown, ChevronRight } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
 import { useNavigate } from 'react-router-dom';
 
 const COLORS = ['#1D9E75', '#2ab98a', '#45d4a0', '#6eeab8', '#a0f0d0', '#c4f5e0'];
+const CHART_TOOLTIP = { background: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))', borderRadius: 8, color: 'hsl(var(--popover-foreground))' };
 
 interface StockBajo { id: string; nombre: string; stock_actual: number; alerta_stock_bajo: number; unidad_medida: string; rubro: string | null; clase: string; linea: string; }
 
@@ -19,6 +20,7 @@ export default function Dashboard() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [stockBajo, setStockBajo] = useState<StockBajo[]>([]);
+  const [alertaAbierta, setAlertaAbierta] = useState(false);
   const [ventas, setVentas] = useState(0);
   const [ingresosMensualidad, setIngresosMensualidad] = useState(0);
   const [gastos, setGastos] = useState(0);
@@ -139,34 +141,46 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {materiaBaja.length > 0 && (
-        <button onClick={() => navigate('/productos')} className="w-full text-left bg-destructive/5 border border-destructive/40 rounded-lg p-3">
-          <div className="flex items-center gap-2 text-destructive font-medium text-sm">
-            <AlertTriangle className="w-4 h-4" />
-            Reponer materia prima ({materiaBaja.length})
-          </div>
-          <div className="mt-2 space-y-2">
-            {Object.entries(materiaPorRubro).map(([grupo, items]) => (
-              <div key={grupo}>
-                <p className="text-xs font-medium">{grupo}</p>
-                {items.map(p => (
-                  <div key={p.id} className="flex justify-between text-xs text-muted-foreground pl-2">
-                    <span>{p.nombre}</span>
-                    <span>queda {p.stock_actual} {p.unidad_medida} (aviso: {p.alerta_stock_bajo})</span>
-                  </div>
-                ))}
-              </div>
-            ))}
-          </div>
-        </button>
-      )}
-
-      {congeladosBajos.length > 0 && (
-        <button onClick={() => navigate('/productos')} className="w-full text-left bg-amber-500/5 border border-amber-500/40 rounded-lg p-3 text-sm flex items-center gap-2">
-          <AlertTriangle className="w-4 h-4 text-amber-600" />
-          <span className="font-medium text-amber-700">{congeladosBajos.length} congelados con stock bajo</span>
-          <span className="ml-auto text-xs text-muted-foreground">ver</span>
-        </button>
+      {(materiaBaja.length > 0 || congeladosBajos.length > 0) && (
+        <div className="rounded-lg border border-destructive/40 bg-destructive/5 overflow-hidden">
+          <button onClick={() => setAlertaAbierta(v => !v)} className="w-full flex items-center gap-2 p-3 text-sm text-destructive font-medium">
+            <span className="relative flex h-2.5 w-2.5">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-destructive opacity-75" />
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-destructive" />
+            </span>
+            Para revisar
+            <span className="text-xs font-normal text-muted-foreground">
+              {materiaBaja.length > 0 && `${materiaBaja.length} materia prima`}
+              {materiaBaja.length > 0 && congeladosBajos.length > 0 && ' · '}
+              {congeladosBajos.length > 0 && `${congeladosBajos.length} congelados`}
+            </span>
+            {alertaAbierta ? <ChevronDown className="w-4 h-4 ml-auto" /> : <ChevronRight className="w-4 h-4 ml-auto" />}
+          </button>
+          {alertaAbierta && (
+            <div className="px-3 pb-3 space-y-3">
+              {materiaBaja.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold">Reponer materia prima</p>
+                  {Object.entries(materiaPorRubro).map(([grupo, items]) => (
+                    <div key={grupo}>
+                      <p className="text-xs font-medium text-muted-foreground">{grupo}</p>
+                      {items.map(p => (
+                        <div key={p.id} className="flex justify-between text-xs text-muted-foreground pl-2">
+                          <span>{p.nombre}</span>
+                          <span>queda {p.stock_actual} {p.unidad_medida} (aviso: {p.alerta_stock_bajo})</span>
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              )}
+              {congeladosBajos.length > 0 && (
+                <p className="text-xs">{congeladosBajos.length} congelados con stock bajo.</p>
+              )}
+              <button onClick={() => navigate('/productos')} className="text-xs text-primary font-medium">Ir a Productos →</button>
+            </div>
+          )}
+        </div>
       )}
 
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
@@ -209,13 +223,14 @@ export default function Dashboard() {
                   cx="50%"
                   cy="50%"
                   outerRadius={70}
-                  label={({ name }) => name}
+                  stroke="none"
                 >
                   {gastosPorCategoria.map((_, i) => (
                     <Cell key={i} fill={COLORS[i % COLORS.length]} />
                   ))}
                 </Pie>
-                <Tooltip formatter={(v: number) => formatCurrency(v)} />
+                <Legend wrapperStyle={{ fontSize: 12 }} />
+                <Tooltip contentStyle={CHART_TOOLTIP} formatter={(v: number) => formatCurrency(v)} />
               </PieChart>
             </ResponsiveContainer>
           ) : (
@@ -227,11 +242,11 @@ export default function Dashboard() {
           <h3 className="text-sm font-medium mb-3">Ventas vs Gastos (6 meses)</h3>
           <ResponsiveContainer width="100%" height={200}>
             <BarChart data={ventasMensuales}>
-              <XAxis dataKey="mes" fontSize={12} />
-              <YAxis fontSize={12} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
-              <Tooltip formatter={(v: number) => formatCurrency(v)} />
+              <XAxis dataKey="mes" fontSize={12} tick={{ fill: 'hsl(var(--muted-foreground))' }} />
+              <YAxis fontSize={12} tick={{ fill: 'hsl(var(--muted-foreground))' }} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
+              <Tooltip contentStyle={CHART_TOOLTIP} formatter={(v: number) => formatCurrency(v)} />
               <Bar dataKey="ventas" fill="#1D9E75" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="gastos" fill="#e5e7eb" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="gastos" fill="hsl(var(--muted-foreground))" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>

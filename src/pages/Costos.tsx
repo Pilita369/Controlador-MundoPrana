@@ -27,7 +27,7 @@ const LINEA_LABEL: Record<string, string> = { congelados: 'Congelados', carta_fi
 function colorMargen(pct: number | null): string {
   if (pct == null) return 'text-muted-foreground';
   if (pct < 20) return 'text-destructive';
-  if (pct < 35) return 'text-amber-600';
+  if (pct < 35) return 'text-amber-500';
   return 'text-primary';
 }
 

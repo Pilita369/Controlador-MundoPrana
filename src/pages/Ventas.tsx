@@ -4,6 +4,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { formatCurrency, formatDate, exportToCSV } from '@/lib/format';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
@@ -19,7 +20,7 @@ import { normalizarNombre } from '@/lib/importParser';
 type TipoIngreso = 'esporadico' | 'mensualidad';
 
 interface Producto { id: string; nombre: string; precio_venta: number; stock_actual: number; }
-interface Cliente { id: string; nombre: string; es_mensual: boolean; monto_mensual: number | null; }
+interface Cliente { id: string; nombre: string; es_mensual: boolean; monto_mensual: number | null; notas: string | null; }
 
 interface ItemLinea {
   producto_id: string;
@@ -44,6 +45,7 @@ interface Pedido {
   cliente_id: string | null;
   tipo_ingreso: string;
   mes_mensualidad: string | null;
+  notas: string | null;
   medio_cobro: string;
   subtotal: number;
   descuento_monto: number;
@@ -82,6 +84,7 @@ const emptyForm = {
   medio_cobro: 'efectivo',
   descuento_tipo: 'porcentaje' as 'porcentaje' | 'monto',
   descuento_valor: 0,
+  notas: '',
   items: [] as ItemLinea[],
 };
 
@@ -167,16 +170,17 @@ export default function Ventas() {
   }
 
   async function loadClientes() {
-    const { data } = await supabase.from('clientes').select('id, nombre, es_mensual, monto_mensual').eq('user_id', user!.id).eq('activo', true).order('nombre');
+    const { data } = await supabase.from('clientes').select('id, nombre, es_mensual, monto_mensual, notas').eq('user_id', user!.id).eq('activo', true).order('nombre');
     setClientes((data as Cliente[]) ?? []);
   }
 
-  async function crearYSeleccionarCliente() {
+  async function crearYSeleccionarCliente(esMensual: boolean) {
     const nombre = buscarCliente.trim();
     if (!nombre) return;
     const { data, error } = await supabase.from('clientes').insert({
-      user_id: user!.id, nombre, es_mensual: true, monto_mensual: form.monto_mensualidad || null,
-    }).select('id, nombre, es_mensual, monto_mensual').single();
+      user_id: user!.id, nombre, es_mensual: esMensual,
+      monto_mensual: esMensual && form.monto_mensualidad ? form.monto_mensualidad : null,
+    }).select('id, nombre, es_mensual, monto_mensual, notas').single();
     if (error) { toast.error(error.message); return; }
     setClientes(cs => [...cs, data as Cliente]);
     seleccionarCliente(data as Cliente);
@@ -250,6 +254,8 @@ export default function Ventas() {
         tipo_ingreso: 'esporadico',
         fecha: p.fecha,
         cliente: p.cliente ?? '',
+        cliente_id: p.cliente_id ?? '',
+        notas: p.notas ?? '',
         medio_cobro: p.medio_cobro,
         descuento_tipo: p.descuento_porcentaje > 0 ? 'porcentaje' : 'monto',
         descuento_valor: p.descuento_porcentaje > 0 ? p.descuento_porcentaje : p.descuento_monto,
@@ -342,9 +348,10 @@ export default function Ventas() {
         const { error: errPedido } = await supabase.from('pedidos').update({
           fecha: form.fecha,
           cliente: form.cliente || null,
+          cliente_id: form.cliente_id || null,
+          notas: form.notas || null,
           medio_cobro: form.medio_cobro,
           tipo_ingreso: 'esporadico',
-          cliente_id: null,
           mes_mensualidad: null,
           subtotal,
           descuento_monto,
@@ -383,6 +390,8 @@ export default function Ventas() {
           user_id: user!.id,
           fecha: form.fecha,
           cliente: form.cliente || null,
+          cliente_id: form.cliente_id || null,
+          notas: form.notas || null,
           medio_cobro: form.medio_cobro,
           subtotal,
           descuento_monto,
@@ -593,7 +602,7 @@ export default function Ventas() {
                               </button>
                             ))}
                             {!clientes.some(c => normalizarNombre(c.nombre) === normalizarNombre(buscarCliente)) && (
-                              <button type="button" className="w-full text-left px-3 py-2 text-sm hover:bg-muted text-primary" onClick={crearYSeleccionarCliente}>
+                              <button type="button" className="w-full text-left px-3 py-2 text-sm hover:bg-muted text-primary" onClick={() => crearYSeleccionarCliente(true)}>
                                 + Crear cliente "{buscarCliente}"
                               </button>
                             )}
@@ -610,18 +619,42 @@ export default function Ventas() {
                 </div>
               ) : (
               <>
-              {/* Fila fecha + cliente */}
-              <div className="grid grid-cols-2 gap-3">
-                <div><Label>Fecha</Label><Input type="date" value={form.fecha} onChange={e => setForm(f => ({ ...f, fecha: e.target.value }))} /></div>
-                <div>
-                  <Label>Cliente (opcional)</Label>
+              <div><Label>Fecha</Label><Input type="date" value={form.fecha} onChange={e => setForm(f => ({ ...f, fecha: e.target.value }))} /></div>
+
+              {/* Cliente */}
+              <div className="space-y-1">
+                <Label>Cliente (opcional)</Label>
+                {form.cliente_id ? (
+                  <div className="flex items-center justify-between border rounded-md px-3 py-2 text-sm">
+                    <span className="font-medium">{form.cliente}</span>
+                    <button type="button" className="text-xs text-muted-foreground hover:text-foreground" onClick={() => setForm(f => ({ ...f, cliente_id: '', cliente: '' }))}>Cambiar</button>
+                  </div>
+                ) : (
                   <div className="relative">
                     <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                    <Input placeholder="Ej: Carlos" value={form.cliente}
-                      onChange={e => setForm(f => ({ ...f, cliente: e.target.value }))}
+                    <Input placeholder="Buscar o escribir nombre..." value={buscarCliente || form.cliente}
+                      onChange={e => { setBuscarCliente(e.target.value); setForm(f => ({ ...f, cliente: e.target.value })); }}
                       className="pl-9" />
+                    {buscarCliente && (
+                      <div className="border rounded-md bg-card shadow-sm max-h-40 overflow-y-auto mt-1">
+                        {clientes.filter(c => c.nombre.toLowerCase().includes(buscarCliente.toLowerCase())).map(c => (
+                          <button key={c.id} type="button" className="w-full text-left px-3 py-2 text-sm hover:bg-muted" onClick={() => seleccionarCliente(c)}>
+                            <span>{c.nombre}</span>
+                            {c.es_mensual && <span className="text-xs text-muted-foreground ml-2">mensual</span>}
+                          </button>
+                        ))}
+                        {!clientes.some(c => normalizarNombre(c.nombre) === normalizarNombre(buscarCliente)) && (
+                          <button type="button" className="w-full text-left px-3 py-2 text-sm hover:bg-muted text-primary" onClick={() => crearYSeleccionarCliente(false)}>
+                            + Crear cliente "{buscarCliente}"
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </div>
-                </div>
+                )}
+                {form.cliente_id && clientes.find(c => c.id === form.cliente_id)?.notas && (
+                  <p className="text-xs text-muted-foreground bg-muted/50 rounded p-2 whitespace-pre-wrap">📝 {clientes.find(c => c.id === form.cliente_id)?.notas}</p>
+                )}
               </div>
 
               {/* Buscador de productos */}
@@ -719,6 +752,14 @@ export default function Ventas() {
                   )}
                 </div>
               )}
+
+              {/* Notas del pedido */}
+              <div className="space-y-1">
+                <Label>Notas del pedido (opcional)</Label>
+                <Textarea rows={2} placeholder="Ej: ensalada sin cebolla, entregar el viernes..."
+                  value={form.notas}
+                  onChange={e => setForm(f => ({ ...f, notas: e.target.value }))} />
+              </div>
               </>
               )}
 
@@ -872,6 +913,9 @@ export default function Ventas() {
                           Desc. {p.descuento_porcentaje > 0 ? `${Math.round(p.descuento_porcentaje)}%` : ''} -{formatCurrency(p.descuento_monto)}
                         </span>
                       </p>
+                    )}
+                    {p.notas && (
+                      <p className="text-xs text-muted-foreground mt-0.5 italic whitespace-pre-wrap">📝 {p.notas}</p>
                     )}
                   </div>
                   <div className="flex items-center gap-1 shrink-0">

@@ -17,6 +17,7 @@ import Costos from "@/pages/Costos";
 import Deudas from "@/pages/Deudas";
 import Resultado from "@/pages/Resultado";
 import Estadisticas from "@/pages/Estadisticas";
+import Clientes from "@/pages/Clientes";
 import Ajustes from "@/pages/Ajustes";
 import NotFound from "@/pages/NotFound";
 
@@ -56,6 +57,7 @@ const App = () => (
             <Route path="/deudas" element={<ProtectedRoute><Deudas /></ProtectedRoute>} />
             <Route path="/resultado" element={<ProtectedRoute><Resultado /></ProtectedRoute>} />
             <Route path="/estadisticas" element={<ProtectedRoute><Estadisticas /></ProtectedRoute>} />
+            <Route path="/clientes" element={<ProtectedRoute><Clientes /></ProtectedRoute>} />
             <Route path="/ajustes" element={<ProtectedRoute><Ajustes /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>

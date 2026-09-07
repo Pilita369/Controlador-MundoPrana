@@ -59,7 +59,9 @@ function defaultForm(tabKey: TabKey) {
   const def = TABS.find(t => t.key === tabKey)!;
   if (def.clase === 'materia_prima') return defaultMateria;
   if (def.clase === 'base') return defaultBase;
-  return { ...base, unidad_medida: 'unidad', tipo: def.tipoDefault ?? 'fresco', linea: (def.linea ?? 'otros') as Linea };
+  // menú del día y carta fija se producen a demanda: no llevan stock ni alerta
+  const sinStock = def.linea === 'menu_dia' || def.linea === 'carta_fija';
+  return { ...base, unidad_medida: 'unidad', tipo: def.tipoDefault ?? 'fresco', linea: (def.linea ?? 'carta_fija') as Linea, alerta_stock_bajo: sinStock ? 0 : 5 };
 }
 
 // Conversiones fijas y conocidas: no tiene sentido pedirle a Pilar que las escriba.
@@ -309,6 +311,10 @@ export default function Productos() {
                     <SelectItem value="maple">Maple</SelectItem>
                     <SelectItem value="docena">Docena</SelectItem>
                     <SelectItem value="1/2 docena">Media docena</SelectItem>
+                    <SelectItem value="cajón">Cajón</SelectItem>
+                    <SelectItem value="atado">Atado</SelectItem>
+                    <SelectItem value="bolsa">Bolsa</SelectItem>
+                    <SelectItem value="bandeja">Bandeja</SelectItem>
                     <SelectItem value="kg">Kg</SelectItem>
                     <SelectItem value="g">Gramos</SelectItem>
                     <SelectItem value="litro">Litro</SelectItem>

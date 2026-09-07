@@ -11,10 +11,9 @@ import { useNavigate } from 'react-router-dom';
 
 const COLORS = ['#1D9E75', '#2ab98a', '#45d4a0', '#6eeab8', '#a0f0d0', '#c4f5e0'];
 
-interface StockBajo { id: string; nombre: string; stock_actual: number; alerta_stock_bajo: number; unidad_medida: string; rubro: string | null; clase: string; }
+interface StockBajo { id: string; nombre: string; stock_actual: number; alerta_stock_bajo: number; unidad_medida: string; rubro: string | null; clase: string; linea: string; }
 
 const RUBRO_LABEL: Record<string, string> = { carnes: 'Carnes', verduras: 'Verduras', lacteos: 'Lácteos', granel: 'A granel', otros: 'Otros' };
-const grupoDe = (p: StockBajo) => p.clase === 'materia_prima' ? (RUBRO_LABEL[p.rubro ?? ''] ?? 'Sin rubro') : 'Elaborados';
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -68,7 +67,7 @@ export default function Dashboard() {
     setMeta(ajustesRes.data?.meta_sueldo_mensual ?? 300000);
 
     const { data: prodStock } = await supabase.from('productos')
-      .select('id, nombre, stock_actual, alerta_stock_bajo, unidad_medida, rubro, clase')
+      .select('id, nombre, stock_actual, alerta_stock_bajo, unidad_medida, rubro, clase, linea')
       .match({ user_id: user.id, activo: true }).gt('alerta_stock_bajo', 0);
     setStockBajo(((prodStock as any[]) ?? []).filter(p => Number(p.stock_actual) <= Number(p.alerta_stock_bajo)));
 
@@ -116,6 +115,14 @@ export default function Dashboard() {
   const balancePersonal = sueldoTotal - gastosPersonales;
   const progreso = meta > 0 ? Math.min((sueldoTotal / meta) * 100, 100) : 0;
 
+  const materiaBaja = stockBajo.filter(p => p.clase === 'materia_prima');
+  const congeladosBajos = stockBajo.filter(p => p.clase === 'elaborado' && p.linea === 'congelados');
+  const materiaPorRubro = materiaBaja.reduce<Record<string, StockBajo[]>>((acc, p) => {
+    const g = RUBRO_LABEL[p.rubro ?? ''] ?? 'Sin rubro';
+    (acc[g] ??= []).push(p);
+    return acc;
+  }, {});
+
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Encabezado principal con logo a la izquierda */}
@@ -132,18 +139,14 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {stockBajo.length > 0 && (
+      {materiaBaja.length > 0 && (
         <button onClick={() => navigate('/productos')} className="w-full text-left bg-destructive/5 border border-destructive/40 rounded-lg p-3">
           <div className="flex items-center gap-2 text-destructive font-medium text-sm">
             <AlertTriangle className="w-4 h-4" />
-            Reponer pronto ({stockBajo.length})
+            Reponer materia prima ({materiaBaja.length})
           </div>
           <div className="mt-2 space-y-2">
-            {Object.entries(
-              stockBajo.reduce<Record<string, StockBajo[]>>((acc, p) => {
-                const g = grupoDe(p); (acc[g] ??= []).push(p); return acc;
-              }, {}),
-            ).map(([grupo, items]) => (
+            {Object.entries(materiaPorRubro).map(([grupo, items]) => (
               <div key={grupo}>
                 <p className="text-xs font-medium">{grupo}</p>
                 {items.map(p => (
@@ -155,6 +158,14 @@ export default function Dashboard() {
               </div>
             ))}
           </div>
+        </button>
+      )}
+
+      {congeladosBajos.length > 0 && (
+        <button onClick={() => navigate('/productos')} className="w-full text-left bg-amber-500/5 border border-amber-500/40 rounded-lg p-3 text-sm flex items-center gap-2">
+          <AlertTriangle className="w-4 h-4 text-amber-600" />
+          <span className="font-medium text-amber-700">{congeladosBajos.length} congelados con stock bajo</span>
+          <span className="ml-auto text-xs text-muted-foreground">ver</span>
         </button>
       )}
 

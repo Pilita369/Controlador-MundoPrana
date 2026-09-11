@@ -7,6 +7,8 @@ export type Json =
   | Json[]
 
 export type Database = {
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
@@ -69,34 +71,40 @@ export type Database = {
       clientes: {
         Row: {
           activo: boolean
+          alias: string[] | null
           created_at: string
           es_mensual: boolean
           id: string
           monto_mensual: number | null
           nombre: string
           notas: string | null
+          tipo_relacion: string
           updated_at: string
           user_id: string
         }
         Insert: {
           activo?: boolean
+          alias?: string[] | null
           created_at?: string
           es_mensual?: boolean
           id?: string
           monto_mensual?: number | null
           nombre: string
           notas?: string | null
+          tipo_relacion?: string
           updated_at?: string
           user_id: string
         }
         Update: {
           activo?: boolean
+          alias?: string[] | null
           created_at?: string
           es_mensual?: boolean
           id?: string
           monto_mensual?: number | null
           nombre?: string
           notas?: string | null
+          tipo_relacion?: string
           updated_at?: string
           user_id?: string
         }
@@ -441,50 +449,196 @@ export type Database = {
         }
         Relationships: []
       }
+      movimientos: {
+        Row: {
+          categoria: string
+          cliente_id: string | null
+          contraparte_nombre: string | null
+          created_at: string
+          cuenta: string | null
+          direccion: string
+          estado_confirmacion: string
+          fecha: string | null
+          fuente: string | null
+          id: string
+          medio_pago: string | null
+          mes_relacionado: string | null
+          monto: number
+          notas: string | null
+          proveedor_id: string | null
+          referencia_externa: string | null
+          user_id: string
+        }
+        Insert: {
+          categoria: string
+          cliente_id?: string | null
+          contraparte_nombre?: string | null
+          created_at?: string
+          cuenta?: string | null
+          direccion: string
+          estado_confirmacion?: string
+          fecha?: string | null
+          fuente?: string | null
+          id?: string
+          medio_pago?: string | null
+          mes_relacionado?: string | null
+          monto: number
+          notas?: string | null
+          proveedor_id?: string | null
+          referencia_externa?: string | null
+          user_id: string
+        }
+        Update: {
+          categoria?: string
+          cliente_id?: string | null
+          contraparte_nombre?: string | null
+          created_at?: string
+          cuenta?: string | null
+          direccion?: string
+          estado_confirmacion?: string
+          fecha?: string | null
+          fuente?: string | null
+          id?: string
+          medio_pago?: string | null
+          mes_relacionado?: string | null
+          monto?: number
+          notas?: string | null
+          proveedor_id?: string | null
+          referencia_externa?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "movimientos_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "movimientos_proveedor_id_fkey"
+            columns: ["proveedor_id"]
+            isOneToOne: false
+            referencedRelation: "proveedores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pagos_trabajador: {
+        Row: {
+          created_at: string
+          estado_confirmacion: string
+          fecha: string | null
+          id: string
+          medio_pago: string | null
+          mes_correspondiente: string | null
+          monto: number
+          notas: string | null
+          tipo: string
+          trabajador_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          estado_confirmacion?: string
+          fecha?: string | null
+          id?: string
+          medio_pago?: string | null
+          mes_correspondiente?: string | null
+          monto: number
+          notas?: string | null
+          tipo: string
+          trabajador_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          estado_confirmacion?: string
+          fecha?: string | null
+          id?: string
+          medio_pago?: string | null
+          mes_correspondiente?: string | null
+          monto?: number
+          notas?: string | null
+          tipo?: string
+          trabajador_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pagos_trabajador_trabajador_id_fkey"
+            columns: ["trabajador_id"]
+            isOneToOne: false
+            referencedRelation: "trabajadores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pedidos: {
         Row: {
+          cantidad_unidades: number | null
+          categoria_venta: string | null
           cliente: string | null
           cliente_id: string | null
           created_at: string
           descuento_monto: number
           descuento_porcentaje: number
+          estado_confirmacion: string
           fecha: string
+          fuente: string | null
           id: string
           medio_cobro: string
+          mes_consumo: string | null
           mes_mensualidad: string | null
           notas: string | null
+          precio_unidad_historico: number | null
+          referencia_externa: string | null
           subtotal: number
           tipo_ingreso: string
           total: number
           user_id: string
         }
         Insert: {
+          cantidad_unidades?: number | null
+          categoria_venta?: string | null
           cliente?: string | null
           cliente_id?: string | null
           created_at?: string
           descuento_monto?: number
           descuento_porcentaje?: number
+          estado_confirmacion?: string
           fecha?: string
+          fuente?: string | null
           id?: string
           medio_cobro?: string
+          mes_consumo?: string | null
           mes_mensualidad?: string | null
           notas?: string | null
+          precio_unidad_historico?: number | null
+          referencia_externa?: string | null
           subtotal?: number
           tipo_ingreso?: string
           total?: number
           user_id: string
         }
         Update: {
+          cantidad_unidades?: number | null
+          categoria_venta?: string | null
           cliente?: string | null
           cliente_id?: string | null
           created_at?: string
           descuento_monto?: number
           descuento_porcentaje?: number
+          estado_confirmacion?: string
           fecha?: string
+          fuente?: string | null
           id?: string
           medio_cobro?: string
+          mes_consumo?: string | null
           mes_mensualidad?: string | null
           notas?: string | null
+          precio_unidad_historico?: number | null
+          referencia_externa?: string | null
           subtotal?: number
           tipo_ingreso?: string
           total?: number
@@ -676,10 +830,10 @@ export type Database = {
           minutos_por_unidad?: number | null
           nombre: string
           porcentaje_ganancia?: number | null
-          rubro?: string | null
           precio_costo?: number
           precio_venta?: number
           precio_venta_manual?: boolean
+          rubro?: string | null
           stock_actual?: number
           tipo: string
           unidad_medida?: string
@@ -710,6 +864,39 @@ export type Database = {
           unidad_medida?: string
           unidad_uso?: string | null
           updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      proveedores: {
+        Row: {
+          activo: boolean
+          alias: string[] | null
+          created_at: string
+          id: string
+          nombre: string
+          notas: string | null
+          rubro: string | null
+          user_id: string
+        }
+        Insert: {
+          activo?: boolean
+          alias?: string[] | null
+          created_at?: string
+          id?: string
+          nombre: string
+          notas?: string | null
+          rubro?: string | null
+          user_id: string
+        }
+        Update: {
+          activo?: boolean
+          alias?: string[] | null
+          created_at?: string
+          id?: string
+          nombre?: string
+          notas?: string | null
+          rubro?: string | null
           user_id?: string
         }
         Relationships: []
@@ -798,6 +985,42 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      trabajadores: {
+        Row: {
+          activo: boolean
+          created_at: string
+          fecha_inicio: string | null
+          id: string
+          nombre: string
+          notas: string | null
+          rol: string | null
+          sueldo_base_actual: number | null
+          user_id: string
+        }
+        Insert: {
+          activo?: boolean
+          created_at?: string
+          fecha_inicio?: string | null
+          id?: string
+          nombre: string
+          notas?: string | null
+          rol?: string | null
+          sueldo_base_actual?: number | null
+          user_id: string
+        }
+        Update: {
+          activo?: boolean
+          created_at?: string
+          fecha_inicio?: string | null
+          id?: string
+          nombre?: string
+          notas?: string | null
+          rol?: string | null
+          sueldo_base_actual?: number | null
+          user_id?: string
+        }
+        Relationships: []
       }
       ventas: {
         Row: {

@@ -45,16 +45,17 @@ export default function Dashboard() {
     const endOfMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()}`;
 
     const [ventasRes, mensualidadRes, gastosNegRes, gastosPerRes, sueldoRes, ajustesRes] = await Promise.all([
-      supabase.from('ventas').select('total').eq('user_id', user.id).gte('fecha', startOfMonth).lte('fecha', endOfMonth),
-      supabase.from('pedidos').select('total').eq('user_id', user.id).eq('tipo_ingreso', 'mensualidad').gte('fecha', startOfMonth).lte('fecha', endOfMonth),
+      supabase.from('pedidos').select('total').eq('user_id', user.id).eq('tipo_ingreso', 'esporadico').eq('estado_confirmacion', 'confirmado').gte('fecha', startOfMonth).lte('fecha', endOfMonth),
+      supabase.from('pedidos').select('total').eq('user_id', user.id).eq('tipo_ingreso', 'mensualidad').eq('estado_confirmacion', 'confirmado').gte('fecha', startOfMonth).lte('fecha', endOfMonth),
       supabase.from('gastos').select('monto, categorias_gasto(nombre)').eq('user_id', user.id).eq('tipo', 'negocio').gte('fecha', startOfMonth).lte('fecha', endOfMonth),
       supabase.from('gastos').select('monto').eq('user_id', user.id).eq('tipo', 'personal').gte('fecha', startOfMonth).lte('fecha', endOfMonth),
       supabase.from('sueldo_retiros').select('monto').eq('user_id', user.id).gte('fecha', startOfMonth).lte('fecha', endOfMonth),
       supabase.from('ajustes_usuario').select('meta_sueldo_mensual').eq('user_id', user.id).single(),
     ]);
 
-    // "ventas" son las esporádicas (ya pasan por la tabla ventas, item por item).
-    // La mensualidad es un ingreso cobrado por adelantado, no genera filas en ventas.
+    // Las esporádicas y la mensualidad viven en "pedidos" (total del pedido); solo se cuentan
+    // las confirmadas. Las esporádicas con detalle de producto ademas generan filas en "ventas",
+    // pero para el total no dependemos de eso (las cargas historicas no siempre tienen ese detalle).
     const totalVentas = ventasRes.data?.reduce((s, v) => s + Number(v.total), 0) ?? 0;
     const totalMensualidad = mensualidadRes.data?.reduce((s, p) => s + Number(p.total), 0) ?? 0;
     const totalGastos = gastosNegRes.data?.reduce((s, g) => s + Number(g.monto), 0) ?? 0;
@@ -88,8 +89,8 @@ export default function Dashboard() {
       const mesLabel = d.toLocaleDateString('es-AR', { month: 'short' });
 
       const [v, m, g] = await Promise.all([
-        supabase.from('ventas').select('total').eq('user_id', user!.id).gte('fecha', start).lte('fecha', end),
-        supabase.from('pedidos').select('total').eq('user_id', user!.id).eq('tipo_ingreso', 'mensualidad').gte('fecha', start).lte('fecha', end),
+        supabase.from('pedidos').select('total').eq('user_id', user!.id).eq('tipo_ingreso', 'esporadico').eq('estado_confirmacion', 'confirmado').gte('fecha', start).lte('fecha', end),
+        supabase.from('pedidos').select('total').eq('user_id', user!.id).eq('tipo_ingreso', 'mensualidad').eq('estado_confirmacion', 'confirmado').gte('fecha', start).lte('fecha', end),
         supabase.from('gastos').select('monto').eq('user_id', user!.id).eq('tipo', 'negocio').gte('fecha', start).lte('fecha', end),
       ]);
 

@@ -46,6 +46,7 @@ interface Pedido {
   tipo_ingreso: string;
   mes_mensualidad: string | null;
   notas: string | null;
+  categoria_venta: string | null;
   medio_cobro: string;
   subtotal: number;
   descuento_monto: number;
@@ -81,6 +82,18 @@ function labelMesMensualidad(mesStr: string) {
   return `${nombre.charAt(0).toUpperCase()}${nombre.slice(1)} ${y}`;
 }
 
+// Venta esporádica "por categoría": para cuando no vale la pena detallar producto por
+// producto (ventas viejas, pedidos grandes) y alcanza con decir de qué fue y el monto final.
+const CATEGORIAS_VENTA_RAPIDA: { value: string; label: string }[] = [
+  { value: 'congelados', label: 'Congelados' },
+  { value: 'vianda_puntual', label: 'Menú del día' },
+  { value: 'carta_fija', label: 'Carta fija' },
+  { value: 'compra_mixta', label: 'Compra mixta' },
+  { value: 'reventa', label: 'Reventa' },
+  { value: 'otro', label: 'Otra venta' },
+];
+const CATEGORIA_VENTA_LABEL: Record<string, string> = Object.fromEntries(CATEGORIAS_VENTA_RAPIDA.map(c => [c.value, c.label]));
+
 const emptyForm = {
   tipo_ingreso: 'esporadico' as TipoIngreso,
   fecha: new Date().toISOString().split('T')[0],
@@ -93,6 +106,9 @@ const emptyForm = {
   descuento_valor: 0,
   notas: '',
   items: [] as ItemLinea[],
+  modo_esporadico: 'detallado' as 'detallado' | 'categoria',
+  categoria_venta: '',
+  monto_rapido: 0,
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -278,6 +294,7 @@ export default function Ventas() {
         medio_cobro: p.medio_cobro,
       });
     } else {
+      const esRapida = p.items.length === 0 && !!p.categoria_venta;
       setForm({
         ...emptyForm,
         tipo_ingreso: 'esporadico',
@@ -294,6 +311,9 @@ export default function Ventas() {
           cantidad: i.cantidad,
           precio_unitario: Number(i.precio_unitario),
         })),
+        modo_esporadico: esRapida ? 'categoria' : 'detallado',
+        categoria_venta: p.categoria_venta ?? '',
+        monto_rapido: esRapida ? Number(p.total) : 0,
       });
     }
     setBuscarProducto('');
@@ -348,9 +368,52 @@ export default function Ventas() {
     load();
   }
 
+  // Venta esporádica "por categoría": sin detalle de productos, solo categoría + monto final.
+  // No genera filas en `ventas` ni descuenta stock (no sabemos qué productos puntuales fueron).
+  async function handleSubmitCategoriaRapida() {
+    if (!form.categoria_venta) { toast.error('Elegí una categoría'); return; }
+    if (!form.monto_rapido || form.monto_rapido <= 0) { toast.error('Ingresá el monto'); return; }
+    const payload = {
+      fecha: form.fecha,
+      cliente: form.cliente || null,
+      cliente_id: form.cliente_id || null,
+      notas: form.notas || null,
+      medio_cobro: form.medio_cobro,
+      tipo_ingreso: 'esporadico',
+      mes_mensualidad: null,
+      categoria_venta: form.categoria_venta,
+      subtotal: form.monto_rapido,
+      descuento_monto: 0,
+      descuento_porcentaje: 0,
+      total: form.monto_rapido,
+    };
+    if (editPedidoId) {
+      // Si venía de una venta detallada, hay que borrar sus items y devolver el stock
+      const pedidoActual = pedidos.find(p => p.id === editPedidoId);
+      if (pedidoActual && pedidoActual.items.length > 0) {
+        for (const item of pedidoActual.items) {
+          const prod = productos.find(p => p.id === item.producto_id);
+          if (prod) await supabase.from('productos').update({ stock_actual: prod.stock_actual + item.cantidad }).eq('id', prod.id);
+        }
+        await supabase.from('ventas').delete().eq('pedido_id', editPedidoId);
+      }
+      const { error } = await supabase.from('pedidos').update(payload).eq('id', editPedidoId);
+      if (error) { toast.error(error.message); return; }
+      toast.success('Venta actualizada');
+    } else {
+      const { error } = await supabase.from('pedidos').insert({ ...payload, user_id: user!.id });
+      if (error) { toast.error(error.message); return; }
+      toast.success('Venta registrada');
+    }
+    setOpen(false);
+    setForm(emptyForm);
+    load(); loadProductos();
+  }
+
   async function handleSubmitPedido(e: React.FormEvent) {
     e.preventDefault();
     if (form.tipo_ingreso === 'mensualidad') { await handleSubmitMensualidad(); return; }
+    if (form.modo_esporadico === 'categoria') { await handleSubmitCategoriaRapida(); return; }
     if (form.items.length === 0) { toast.error('Agregá al menos un producto'); return; }
 
     const { subtotal, descuento_monto, descuento_porcentaje, total } = calcTotales(
@@ -382,6 +445,7 @@ export default function Ventas() {
           medio_cobro: form.medio_cobro,
           tipo_ingreso: 'esporadico',
           mes_mensualidad: null,
+          categoria_venta: null,
           subtotal,
           descuento_monto,
           descuento_porcentaje,
@@ -717,6 +781,37 @@ export default function Ventas() {
                 )}
               </div>
 
+              {/* Detallado vs por categoría */}
+              <div className="flex gap-2">
+                <button type="button" onClick={() => setForm(f => ({ ...f, modo_esporadico: 'detallado' }))}
+                  className={`flex-1 rounded-md border px-3 py-1.5 text-xs font-medium ${form.modo_esporadico === 'detallado' ? 'bg-primary text-primary-foreground border-primary' : 'text-muted-foreground'}`}>
+                  Detallado
+                </button>
+                <button type="button" onClick={() => setForm(f => ({ ...f, modo_esporadico: 'categoria' }))}
+                  className={`flex-1 rounded-md border px-3 py-1.5 text-xs font-medium ${form.modo_esporadico === 'categoria' ? 'bg-primary text-primary-foreground border-primary' : 'text-muted-foreground'}`}>
+                  Por categoría (monto final)
+                </button>
+              </div>
+
+              {form.modo_esporadico === 'categoria' ? (
+                <div className="space-y-3">
+                  <div>
+                    <Label>Categoría</Label>
+                    <Select value={form.categoria_venta} onValueChange={v => setForm(f => ({ ...f, categoria_venta: v }))}>
+                      <SelectTrigger><SelectValue placeholder="Elegir categoría" /></SelectTrigger>
+                      <SelectContent>
+                        {CATEGORIAS_VENTA_RAPIDA.map(c => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label>Monto final</Label>
+                    <Input type="number" step="0.01" value={form.monto_rapido || ''} onChange={e => setForm(f => ({ ...f, monto_rapido: parseFloat(e.target.value) || 0 }))} placeholder="$0" />
+                  </div>
+                  <p className="text-xs text-muted-foreground">No descuenta stock ni pide productos: sirve para cargar rápido una venta vieja o un pedido grande sin el detalle.</p>
+                </div>
+              ) : (
+              <>
               {/* Buscador de productos */}
               <div className="space-y-1">
                 <Label>Agregar producto</Label>
@@ -822,6 +917,8 @@ export default function Ventas() {
                   )}
                 </div>
               )}
+              </>
+              )}
 
               {/* Notas del pedido */}
               <div className="space-y-1">
@@ -853,6 +950,13 @@ export default function Ventas() {
                     <span>MENSUALIDAD</span><span className="text-primary">{formatCurrency(form.monto_mensualidad)}</span>
                   </div>
                 )
+              ) : form.modo_esporadico === 'categoria' ? (
+                form.monto_rapido > 0 && (
+                  <div className="bg-muted/50 rounded-lg p-3 flex justify-between font-semibold text-base">
+                    <span>{form.categoria_venta ? CATEGORIA_VENTA_LABEL[form.categoria_venta] : 'TOTAL'}</span>
+                    <span className="text-primary">{formatCurrency(form.monto_rapido)}</span>
+                  </div>
+                )
               ) : form.items.length > 0 && (
                 <div className="bg-muted/50 rounded-lg p-3 space-y-1 text-sm">
                   <div className="flex justify-between text-muted-foreground">
@@ -869,7 +973,11 @@ export default function Ventas() {
                 </div>
               )}
 
-              <Button type="submit" className="w-full" disabled={form.tipo_ingreso === 'mensualidad' ? !form.cliente.trim() || form.monto_mensualidad <= 0 : form.items.length === 0}>
+              <Button type="submit" className="w-full" disabled={
+                form.tipo_ingreso === 'mensualidad' ? !form.cliente.trim() || form.monto_mensualidad <= 0
+                : form.modo_esporadico === 'categoria' ? !form.categoria_venta || form.monto_rapido <= 0
+                : form.items.length === 0
+              }>
                 {editPedidoId ? 'Guardar cambios' : form.tipo_ingreso === 'mensualidad' ? 'Registrar mensualidad' : 'Registrar venta'}
               </Button>
             </form>
@@ -909,6 +1017,19 @@ export default function Ventas() {
                 'Total Item': e.data.total,
                 'Total Pedido': e.data.total,
                 Descuento: 0,
+                Medio: e.data.medio_cobro,
+              }];
+            }
+            if (e.tipo === 'pedido' && e.data.items.length === 0) {
+              return [{
+                Fecha: e.data.fecha,
+                Cliente: e.data.cliente ?? '',
+                Producto: e.data.categoria_venta ? CATEGORIA_VENTA_LABEL[e.data.categoria_venta] ?? e.data.categoria_venta : '(sin detalle)',
+                Cantidad: 1,
+                'Precio Unit': e.data.total,
+                'Total Item': e.data.total,
+                'Total Pedido': e.data.total,
+                Descuento: e.data.descuento_monto,
                 Medio: e.data.medio_cobro,
               }];
             }
@@ -1007,10 +1128,13 @@ export default function Ventas() {
                                     )}
                                     <span className="text-xs text-muted-foreground">{formatDate(p.fecha)} · {p.medio_cobro}</span>
                                     {p.items.length > 1 && <span className="text-xs bg-muted px-1.5 py-0.5 rounded">{p.items.length} productos</span>}
+                                    {p.items.length === 0 && p.categoria_venta && <Badge variant="secondary" className="text-xs">{CATEGORIA_VENTA_LABEL[p.categoria_venta] ?? p.categoria_venta}</Badge>}
                                   </div>
-                                  <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
-                                    {p.items.map(i => `${i.productos?.nombre ?? '?'} ×${i.cantidad}`).join(' · ')}
-                                  </p>
+                                  {p.items.length > 0 && (
+                                    <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
+                                      {p.items.map(i => `${i.productos?.nombre ?? '?'} ×${i.cantidad}`).join(' · ')}
+                                    </p>
+                                  )}
                                   {tieneDescuento && (
                                     <p className="text-xs text-muted-foreground mt-0.5">
                                       Subtotal {formatCurrency(p.subtotal)}

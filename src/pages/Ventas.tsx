@@ -125,7 +125,7 @@ export default function Ventas() {
   const [buscarProducto, setBuscarProducto] = useState('');
   const [form, setForm] = useState(emptyForm);
   const [deleteTarget, setDeleteTarget] = useState<{ tipo: 'pedido' | 'legacy'; id: string } | null>(null);
-  const [clientesExpandidos, setClientesExpandidos] = useState<Set<string>>(new Set());
+  const [mesesExpandidos, setMesesExpandidos] = useState<Set<string>>(() => new Set([mesActual()]));
 
   // Form de legacy (venta individual vieja)
   const [legacyForm, setLegacyForm] = useState({
@@ -199,25 +199,22 @@ export default function Ventas() {
     setBuscarCliente('');
   }
 
-  function toggleClienteExpandido(key: string) {
-    setClientesExpandidos(prev => {
+  function toggleMesExpandido(key: string) {
+    setMesesExpandidos(prev => {
       const next = new Set(prev);
       if (next.has(key)) next.delete(key); else next.add(key);
       return next;
     });
   }
 
-  // Agregar un mes más para un cliente mensual, desde su tarjeta desplegable
-  function openNuevaMensualidadPara(grupo: { clienteId: string | null; clienteNombre: string; montoSugerido: number }) {
+  // Agregar cualquier venta (esporádica por defecto, se puede cambiar a mensualidad en el modal)
+  // directo desde la tarjeta de un mes; el mes queda prellenado.
+  function openNuevoParaMes(mesKey: string) {
     setEditPedidoId(null);
     setEditLegacyId(null);
-    setForm({
-      ...emptyForm,
-      tipo_ingreso: 'mensualidad',
-      cliente_id: grupo.clienteId ?? '',
-      cliente: grupo.clienteNombre,
-      monto_mensualidad: grupo.montoSugerido,
-    });
+    const hoy = new Date().toISOString().slice(0, 10);
+    const fecha = hoy.slice(0, 7) === mesKey ? hoy : `${mesKey}-01`;
+    setForm({ ...emptyForm, fecha, mes_mensualidad: mesKey });
     setBuscarProducto('');
     setBuscarCliente('');
     setOpen(true);
@@ -534,21 +531,36 @@ export default function Ventas() {
     form.items, form.descuento_tipo, form.descuento_valor
   );
 
-  // ── Agrupar mensualidades por cliente para las tarjetas desplegables ─────────
-  const mensualidadFiltrada = pedidos.filter(p =>
-    p.tipo_ingreso === 'mensualidad' && (p.cliente ?? '').toLowerCase().includes(search.toLowerCase())
-  );
-  const gruposMap = new Map<string, { key: string; clienteId: string | null; clienteNombre: string; pedidos: Pedido[]; total: number }>();
-  mensualidadFiltrada.forEach(p => {
-    const key = p.cliente_id ?? p.cliente ?? 'sin-cliente';
-    if (!gruposMap.has(key)) gruposMap.set(key, { key, clienteId: p.cliente_id, clienteNombre: p.cliente ?? 'Sin cliente', pedidos: [], total: 0 });
-    const g = gruposMap.get(key)!;
-    g.pedidos.push(p);
-    g.total += Number(p.total);
+  // ── Agrupar todos los movimientos por mes, para las tarjetas desplegables ────
+  // Mensualidad se agrupa por mes de consumo (mes_mensualidad); esporádicas y ventas
+  // viejas por la fecha real del movimiento. Así el mes coincide con el que se usa
+  // en Estadísticas.
+  interface MesVenta { key: string; label: string; total: number; mensualidad: Pedido[]; otras: EntradaLista[]; }
+  const mesesMap = new Map<string, MesVenta>();
+  function getMes(key: string): MesVenta {
+    if (!mesesMap.has(key)) mesesMap.set(key, { key, label: labelMesMensualidad(key), total: 0, mensualidad: [], otras: [] });
+    return mesesMap.get(key)!;
+  }
+  entradasFiltradas.forEach(e => {
+    if (e.tipo === 'pedido' && e.data.tipo_ingreso === 'mensualidad') {
+      const key = (e.data.mes_mensualidad ?? e.data.fecha).slice(0, 7);
+      const g = getMes(key);
+      g.mensualidad.push(e.data);
+      g.total += Number(e.data.total);
+    } else {
+      const key = e.data.fecha.slice(0, 7);
+      const g = getMes(key);
+      g.otras.push(e);
+      g.total += Number(e.data.total);
+    }
   });
-  const gruposMensualidad = Array.from(gruposMap.values())
-    .map(g => ({ ...g, pedidos: [...g.pedidos].sort((a, b) => (b.mes_mensualidad ?? b.fecha).localeCompare(a.mes_mensualidad ?? a.fecha)) }))
-    .sort((a, b) => (b.pedidos[0]?.fecha ?? '').localeCompare(a.pedidos[0]?.fecha ?? ''));
+  const mesesVenta = Array.from(mesesMap.values())
+    .map(g => ({
+      ...g,
+      mensualidad: [...g.mensualidad].sort((a, b) => a.cliente?.localeCompare(b.cliente ?? '') ?? 0),
+      otras: [...g.otras].sort((a, b) => b.data.fecha.localeCompare(a.data.fecha)),
+    }))
+    .sort((a, b) => b.key.localeCompare(a.key));
 
   // ── Render ────────────────────────────────────────────────────────────────────
 
@@ -931,133 +943,124 @@ export default function Ventas() {
         ))}
       </div>
 
-      {/* ── Mensualidades por cliente, en tarjetas desplegables ─────────────────── */}
-      {gruposMensualidad.length > 0 && (
-        <div className="space-y-2">
-          <h2 className="text-sm font-medium text-muted-foreground">Clientes mensuales</h2>
-          {gruposMensualidad.map(grupo => {
-            const abierto = clientesExpandidos.has(grupo.key);
-            const clienteInfo = clientes.find(c => c.id === grupo.clienteId);
-            const montoSugerido = clienteInfo?.monto_mensual ?? grupo.pedidos[0]?.total ?? 0;
-            return (
-              <div key={grupo.key} className="bg-card rounded-lg border overflow-hidden">
-                <button type="button" onClick={() => toggleClienteExpandido(grupo.key)}
-                  className="w-full flex items-center justify-between gap-2 p-3 text-left">
-                  <span className="flex items-center gap-2 min-w-0">
-                    <User className="w-4 h-4 text-muted-foreground shrink-0" />
-                    <span className="font-semibold text-sm truncate">{grupo.clienteNombre}</span>
-                    <Badge variant="secondary" className="text-xs shrink-0">{grupo.pedidos.length} {grupo.pedidos.length === 1 ? 'mes' : 'meses'}</Badge>
-                  </span>
-                  <span className="flex items-center gap-2 shrink-0">
-                    <span className="font-semibold text-sm">{formatCurrency(grupo.total)}</span>
-                    {abierto ? <ChevronDown className="w-4 h-4 text-muted-foreground" /> : <ChevronRight className="w-4 h-4 text-muted-foreground" />}
-                  </span>
-                </button>
-                {abierto && (
-                  <div className="border-t divide-y">
-                    {grupo.pedidos.map(p => (
-                      <div key={p.id} className="flex items-center justify-between gap-2 p-3">
-                        <div className="min-w-0">
-                          <p className="text-sm font-medium">{p.mes_mensualidad ? labelMesMensualidad(p.mes_mensualidad.slice(0, 7)) : formatDate(p.fecha)}</p>
-                          <p className="text-xs text-muted-foreground">
-                            Pagado {formatDate(p.fecha)} · {p.medio_cobro}{p.notas ? ` · ${p.notas}` : ''}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-1 shrink-0">
-                          <span className="font-semibold text-sm">{formatCurrency(Number(p.total))}</span>
-                          <Button variant="ghost" size="sm" onClick={() => openEditPedido(p)}><Edit2 className="w-3.5 h-3.5" /></Button>
-                          <Button variant="ghost" size="sm" onClick={() => setDeleteTarget({ tipo: 'pedido', id: p.id })} className="text-destructive hover:text-destructive"><Trash2 className="w-3.5 h-3.5" /></Button>
-                        </div>
-                      </div>
-                    ))}
-                    <div className="p-2">
-                      <Button variant="outline" size="sm" className="w-full"
-                        onClick={() => openNuevaMensualidadPara({ clienteId: grupo.clienteId, clienteNombre: grupo.clienteNombre, montoSugerido })}>
-                        <Plus className="w-3.5 h-3.5 mr-1" /> Agregar mes / corregir
-                      </Button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {/* ── Lista ────────────────────────────────────────────────────────────── */}
+      {/* ── Un mes, una tarjeta ──────────────────────────────────────────────── */}
       <div className="space-y-2">
-        {entradasFiltradas.map(entrada => {
-          if (entrada.tipo === 'pedido') {
-            const p = entrada.data;
-            const esMensualidad = p.tipo_ingreso === 'mensualidad';
-            if (esMensualidad) return null; // ya se muestra arriba, agrupado por cliente
-            const tieneDescuento = p.descuento_monto > 0;
-            return (
-              <div key={`pedido-${p.id}`} className="bg-card rounded-lg border p-3 space-y-2">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      {p.cliente && (
-                        <span className="font-semibold text-sm flex items-center gap-1">
-                          <User className="w-3.5 h-3.5 text-muted-foreground" />{p.cliente}
-                        </span>
-                      )}
-                      <span className="text-xs text-muted-foreground">{formatDate(p.fecha)}</span>
-                      <span className="text-xs text-muted-foreground">· {p.medio_cobro}</span>
-                      {esMensualidad
-                        ? <Badge variant="secondary" className="text-xs">Mensualidad{p.mes_mensualidad ? ` · ${p.mes_mensualidad.slice(0, 7)}` : ''}</Badge>
-                        : p.items.length > 1 && (
-                          <span className="text-xs bg-muted px-1.5 py-0.5 rounded">{p.items.length} productos</span>
-                        )}
+        {mesesVenta.map(mes => {
+          const abierto = mesesExpandidos.has(mes.key);
+          const cantidad = mes.mensualidad.length + mes.otras.length;
+          return (
+            <div key={mes.key} className="bg-card rounded-lg border overflow-hidden">
+              <button type="button" onClick={() => toggleMesExpandido(mes.key)}
+                className="w-full flex items-center justify-between gap-2 p-3 text-left">
+                <span className="flex items-center gap-2 min-w-0">
+                  <span className="font-semibold text-sm truncate">{mes.label}</span>
+                  <Badge variant="secondary" className="text-xs shrink-0">{cantidad} {cantidad === 1 ? 'movimiento' : 'movimientos'}</Badge>
+                </span>
+                <span className="flex items-center gap-2 shrink-0">
+                  <span className="font-semibold text-sm">{formatCurrency(mes.total)}</span>
+                  {abierto ? <ChevronDown className="w-4 h-4 text-muted-foreground" /> : <ChevronRight className="w-4 h-4 text-muted-foreground" />}
+                </span>
+              </button>
+              {abierto && (
+                <div className="border-t divide-y">
+                  {mes.mensualidad.length > 0 && (
+                    <div className="divide-y">
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide px-3 pt-2 pb-1">Mensualidad</p>
+                      {mes.mensualidad.map(p => {
+                        return (
+                          <div key={p.id} className="flex items-center justify-between gap-2 px-3 py-2">
+                            <div className="min-w-0">
+                              <p className="text-sm font-medium flex items-center gap-1">
+                                <User className="w-3.5 h-3.5 text-muted-foreground shrink-0" />{p.cliente ?? 'Sin cliente'}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                Pagado {formatDate(p.fecha)} · {p.medio_cobro}{p.notas ? ` · ${p.notas}` : ''}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-1 shrink-0">
+                              <span className="font-semibold text-sm">{formatCurrency(Number(p.total))}</span>
+                              <Button variant="ghost" size="sm" onClick={() => openEditPedido(p)}><Edit2 className="w-3.5 h-3.5" /></Button>
+                              <Button variant="ghost" size="sm" onClick={() => setDeleteTarget({ tipo: 'pedido', id: p.id })} className="text-destructive hover:text-destructive"><Trash2 className="w-3.5 h-3.5" /></Button>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
-                    {/* Items en línea */}
-                    {!esMensualidad && (
-                      <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
-                        {p.items.map(i => `${i.productos?.nombre ?? '?'} ×${i.cantidad}`).join(' · ')}
-                      </p>
-                    )}
-                    {/* Descuento */}
-                    {!esMensualidad && tieneDescuento && (
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        Subtotal {formatCurrency(p.subtotal)}
-                        {' · '}
-                        <span className="text-red-500">
-                          Desc. {p.descuento_porcentaje > 0 ? `${Math.round(p.descuento_porcentaje)}%` : ''} -{formatCurrency(p.descuento_monto)}
-                        </span>
-                      </p>
-                    )}
-                    {p.notas && (
-                      <p className="text-xs text-muted-foreground mt-0.5 italic whitespace-pre-wrap">📝 {p.notas}</p>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-1 shrink-0">
-                    <p className="font-semibold text-sm">{formatCurrency(Number(p.total))}</p>
-                    <Button variant="ghost" size="sm" onClick={() => openEditPedido(p)}><Edit2 className="w-3.5 h-3.5" /></Button>
-                    <Button variant="ghost" size="sm" onClick={() => setDeleteTarget({ tipo: 'pedido', id: p.id })} className="text-destructive hover:text-destructive"><Trash2 className="w-3.5 h-3.5" /></Button>
+                  )}
+
+                  {mes.otras.length > 0 && (
+                    <div className="divide-y">
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide px-3 pt-2 pb-1">Esporádicas</p>
+                      {mes.otras.map(entrada => {
+                        if (entrada.tipo === 'pedido') {
+                          const p = entrada.data;
+                          const tieneDescuento = p.descuento_monto > 0;
+                          return (
+                            <div key={`pedido-${p.id}`} className="px-3 py-2 space-y-1">
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    {p.cliente && (
+                                      <span className="font-medium text-sm flex items-center gap-1">
+                                        <User className="w-3.5 h-3.5 text-muted-foreground" />{p.cliente}
+                                      </span>
+                                    )}
+                                    <span className="text-xs text-muted-foreground">{formatDate(p.fecha)} · {p.medio_cobro}</span>
+                                    {p.items.length > 1 && <span className="text-xs bg-muted px-1.5 py-0.5 rounded">{p.items.length} productos</span>}
+                                  </div>
+                                  <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
+                                    {p.items.map(i => `${i.productos?.nombre ?? '?'} ×${i.cantidad}`).join(' · ')}
+                                  </p>
+                                  {tieneDescuento && (
+                                    <p className="text-xs text-muted-foreground mt-0.5">
+                                      Subtotal {formatCurrency(p.subtotal)}
+                                      {' · '}
+                                      <span className="text-red-500">
+                                        Desc. {p.descuento_porcentaje > 0 ? `${Math.round(p.descuento_porcentaje)}%` : ''} -{formatCurrency(p.descuento_monto)}
+                                      </span>
+                                    </p>
+                                  )}
+                                  {p.notas && <p className="text-xs text-muted-foreground mt-0.5 italic whitespace-pre-wrap">📝 {p.notas}</p>}
+                                </div>
+                                <div className="flex items-center gap-1 shrink-0">
+                                  <p className="font-semibold text-sm">{formatCurrency(Number(p.total))}</p>
+                                  <Button variant="ghost" size="sm" onClick={() => openEditPedido(p)}><Edit2 className="w-3.5 h-3.5" /></Button>
+                                  <Button variant="ghost" size="sm" onClick={() => setDeleteTarget({ tipo: 'pedido', id: p.id })} className="text-destructive hover:text-destructive"><Trash2 className="w-3.5 h-3.5" /></Button>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        }
+                        const v = entrada.data;
+                        return (
+                          <div key={`legacy-${v.id}`} className="px-3 py-2 flex items-center justify-between gap-2">
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium text-sm">{v.productos?.nombre}</p>
+                              <p className="text-xs text-muted-foreground">{formatDate(v.fecha)} · {v.cantidad} × {formatCurrency(Number(v.precio_unitario))} · {v.medio_cobro}</p>
+                            </div>
+                            <p className="font-semibold text-sm shrink-0">{formatCurrency(Number(v.total))}</p>
+                            <div className="flex gap-1 shrink-0">
+                              <Button variant="ghost" size="sm" onClick={() => openEditLegacy(v)}><Edit2 className="w-3.5 h-3.5" /></Button>
+                              <Button variant="ghost" size="sm" onClick={() => setDeleteTarget({ tipo: 'legacy', id: v.id })} className="text-destructive hover:text-destructive"><Trash2 className="w-3.5 h-3.5" /></Button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  <div className="p-2">
+                    <Button variant="outline" size="sm" className="w-full" onClick={() => openNuevoParaMes(mes.key)}>
+                      <Plus className="w-3.5 h-3.5 mr-1" /> Agregar venta a {mes.label}
+                    </Button>
                   </div>
                 </div>
-              </div>
-            );
-          }
-
-          // Legacy venta
-          const v = entrada.data;
-          return (
-            <div key={`legacy-${v.id}`} className="bg-card rounded-lg border p-3 flex items-center justify-between gap-2">
-              <div className="flex-1 min-w-0">
-                <p className="font-medium text-sm">{v.productos?.nombre}</p>
-                <p className="text-xs text-muted-foreground">{formatDate(v.fecha)} · {v.cantidad} × {formatCurrency(Number(v.precio_unitario))} · {v.medio_cobro}</p>
-              </div>
-              <p className="font-semibold text-sm shrink-0">{formatCurrency(Number(v.total))}</p>
-              <div className="flex gap-1 shrink-0">
-                <Button variant="ghost" size="sm" onClick={() => openEditLegacy(v)}><Edit2 className="w-3.5 h-3.5" /></Button>
-                <Button variant="ghost" size="sm" onClick={() => setDeleteTarget({ tipo: 'legacy', id: v.id })} className="text-destructive hover:text-destructive"><Trash2 className="w-3.5 h-3.5" /></Button>
-              </div>
+              )}
             </div>
           );
         })}
-        {entradasFiltradas.filter(e => !(e.tipo === 'pedido' && e.data.tipo_ingreso === 'mensualidad')).length === 0 && (
-          <p className="text-muted-foreground text-sm text-center py-8">No hay ventas esporádicas registradas</p>
+        {mesesVenta.length === 0 && (
+          <p className="text-muted-foreground text-sm text-center py-8">No hay ventas registradas</p>
         )}
       </div>
     </div>

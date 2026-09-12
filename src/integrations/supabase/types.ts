@@ -461,6 +461,7 @@ export type Database = {
           fecha: string | null
           fuente: string | null
           id: string
+          linked_transfer_id: string | null
           medio_pago: string | null
           mes_relacionado: string | null
           monto: number
@@ -480,6 +481,7 @@ export type Database = {
           fecha?: string | null
           fuente?: string | null
           id?: string
+          linked_transfer_id?: string | null
           medio_pago?: string | null
           mes_relacionado?: string | null
           monto: number
@@ -499,6 +501,7 @@ export type Database = {
           fecha?: string | null
           fuente?: string | null
           id?: string
+          linked_transfer_id?: string | null
           medio_pago?: string | null
           mes_relacionado?: string | null
           monto?: number
@@ -513,6 +516,13 @@ export type Database = {
             columns: ["cliente_id"]
             isOneToOne: false
             referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "movimientos_linked_transfer_id_fkey"
+            columns: ["linked_transfer_id"]
+            isOneToOne: false
+            referencedRelation: "movimientos"
             referencedColumns: ["id"]
           },
           {

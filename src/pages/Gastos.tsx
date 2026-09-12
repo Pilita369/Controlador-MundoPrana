@@ -17,6 +17,7 @@ interface Categoria { id: string; nombre: string; tipo: string; }
 interface Gasto { id: string; fecha: string; descripcion: string; monto: number; tipo: string; medio_pago: string; notas: string | null; categoria_id: string | null; categorias_gasto: { nombre: string } | null; }
 
 const emptyForm = { fecha: new Date().toISOString().split('T')[0], descripcion: '', monto: 0, categoria_id: '', medio_pago: 'efectivo', notas: '' };
+const TAB_LABEL: Record<string, string> = { negocio: 'Negocio', personal: 'Personal', inversion: 'Inversión' };
 
 export default function Gastos() {
   const { user } = useAuth();
@@ -98,7 +99,7 @@ export default function Gastos() {
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
-          <DialogHeader><DialogTitle>{editId ? 'Editar gasto' : `Registrar gasto (${tab})`}</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{editId ? 'Editar gasto' : `Registrar gasto (${TAB_LABEL[tab] ?? tab})`}</DialogTitle></DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-3">
             <div><Label>Fecha</Label><Input type="date" value={form.fecha} onChange={e => setForm(f => ({ ...f, fecha: e.target.value }))} /></div>
             <div><Label>Descripción</Label><Input value={form.descripcion} onChange={e => setForm(f => ({ ...f, descripcion: e.target.value }))} required /></div>
@@ -143,8 +144,15 @@ export default function Gastos() {
       </AlertDialog>
 
       <Tabs value={tab} onValueChange={setTab}>
-        <TabsList className="w-full"><TabsTrigger value="negocio" className="flex-1">Negocio</TabsTrigger><TabsTrigger value="personal" className="flex-1">Personal</TabsTrigger></TabsList>
+        <TabsList className="w-full">
+          <TabsTrigger value="negocio" className="flex-1">Negocio</TabsTrigger>
+          <TabsTrigger value="personal" className="flex-1">Personal</TabsTrigger>
+          <TabsTrigger value="inversion" className="flex-1">Inversión</TabsTrigger>
+        </TabsList>
       </Tabs>
+      {tab === 'inversion' && (
+        <p className="text-xs text-muted-foreground -mt-2">Plata destinada a generar valor futuro (equipamiento, mejoras, ahorro), no es un gasto operativo habitual.</p>
+      )}
 
       <div className="flex items-center justify-between">
         <span className="text-sm font-medium">Total: {formatCurrency(total)}</span>

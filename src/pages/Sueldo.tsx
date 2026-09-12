@@ -15,9 +15,10 @@ import { Plus, Download, Wallet, Package, Trash2, Edit2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface Producto { id: string; nombre: string; precio_costo: number; stock_actual: number; unidad_medida: string; }
-interface Retiro { id: string; fecha: string; tipo: string; monto: number; medio_pago: string | null; cantidad_producto: number | null; notas: string | null; producto_id: string | null; productos: { nombre: string } | null; }
+interface Retiro { id: string; fecha: string; tipo: string; monto: number; medio_pago: string | null; categoria: string | null; cantidad_producto: number | null; notas: string | null; producto_id: string | null; productos: { nombre: string } | null; }
+interface Categoria { id: string; nombre: string; }
 
-const emptyDinero = { fecha: new Date().toISOString().split('T')[0], monto: 0, medio_pago: 'efectivo', notas: '' };
+const emptyDinero = { fecha: new Date().toISOString().split('T')[0], monto: 0, medio_pago: 'efectivo', categoria: '', notas: '' };
 const emptyEspecie = { fecha: new Date().toISOString().split('T')[0], producto_id: '', cantidad: 1, notas: '' };
 
 export default function Sueldo() {
@@ -32,8 +33,10 @@ export default function Sueldo() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [formDinero, setFormDinero] = useState(emptyDinero);
   const [formEspecie, setFormEspecie] = useState(emptyEspecie);
+  const [categorias, setCategorias] = useState<Categoria[]>([]);
+  const [nuevaCategoria, setNuevaCategoria] = useState('');
 
-  useEffect(() => { if (user) { load(); loadProductos(); loadMeta(); } }, [user]);
+  useEffect(() => { if (user) { load(); loadProductos(); loadMeta(); loadCategorias(); } }, [user]);
 
   async function load() {
     const { data } = await supabase.from('sueldo_retiros').select('*, productos(nombre)').eq('user_id', user!.id).order('fecha', { ascending: false });
@@ -47,12 +50,26 @@ export default function Sueldo() {
     const { data } = await supabase.from('ajustes_usuario').select('meta_sueldo_mensual').eq('user_id', user!.id).single();
     if (data) setMeta(data.meta_sueldo_mensual);
   }
+  // Mismas categorías que Gastos → Personal, así queda todo consistente.
+  async function loadCategorias() {
+    const { data } = await supabase.from('categorias_gasto').select('id, nombre').eq('user_id', user!.id).eq('tipo', 'personal').order('nombre');
+    setCategorias((data as Categoria[]) ?? []);
+  }
+  async function addCategoria() {
+    if (!nuevaCategoria.trim()) return;
+    const { data, error } = await supabase.from('categorias_gasto').insert({ user_id: user!.id, nombre: nuevaCategoria.trim(), tipo: 'personal' }).select('id, nombre').single();
+    if (error) { toast.error(error.message); return; }
+    setCategorias(cs => [...cs, data as Categoria].sort((a, b) => a.nombre.localeCompare(b.nombre)));
+    setFormDinero(f => ({ ...f, categoria: (data as Categoria).nombre }));
+    setNuevaCategoria('');
+    toast.success('Categoría creada');
+  }
 
   function openEditRetiro(r: Retiro) {
     setEditId(r.id);
     setEditTipo(r.tipo);
     if (r.tipo === 'dinero') {
-      setFormDinero({ fecha: r.fecha, monto: Number(r.monto), medio_pago: r.medio_pago ?? 'efectivo', notas: r.notas ?? '' });
+      setFormDinero({ fecha: r.fecha, monto: Number(r.monto), medio_pago: r.medio_pago ?? 'efectivo', categoria: r.categoria ?? '', notas: r.notas ?? '' });
       setOpenDinero(true);
     } else {
       setFormEspecie({ fecha: r.fecha, producto_id: r.producto_id ?? '', cantidad: r.cantidad_producto ?? 1, notas: r.notas ?? '' });
@@ -66,10 +83,10 @@ export default function Sueldo() {
   async function submitDinero(e: React.FormEvent) {
     e.preventDefault();
     if (editId) {
-      await supabase.from('sueldo_retiros').update({ fecha: formDinero.fecha, monto: formDinero.monto, medio_pago: formDinero.medio_pago, notas: formDinero.notas || null }).eq('id', editId);
+      await supabase.from('sueldo_retiros').update({ fecha: formDinero.fecha, monto: formDinero.monto, medio_pago: formDinero.medio_pago, categoria: formDinero.categoria || null, notas: formDinero.notas || null }).eq('id', editId);
       toast.success('Retiro actualizado');
     } else {
-      await supabase.from('sueldo_retiros').insert({ user_id: user!.id, tipo: 'dinero', fecha: formDinero.fecha, monto: formDinero.monto, medio_pago: formDinero.medio_pago, notas: formDinero.notas || null });
+      await supabase.from('sueldo_retiros').insert({ user_id: user!.id, tipo: 'dinero', fecha: formDinero.fecha, monto: formDinero.monto, medio_pago: formDinero.medio_pago, categoria: formDinero.categoria || null, notas: formDinero.notas || null });
       toast.success('Retiro registrado');
     }
     setOpenDinero(false); load();
@@ -122,9 +139,23 @@ export default function Sueldo() {
       <Dialog open={openDinero} onOpenChange={v => { setOpenDinero(v); if (!v) setEditId(null); }}>
         <DialogContent>
           <DialogHeader><DialogTitle>{editId ? 'Editar retiro en dinero' : 'Retiro en dinero'}</DialogTitle></DialogHeader>
+          <p className="text-xs text-muted-foreground -mt-2">Plata que sacás del negocio para vos: compras personales, lo que sea. Elegí en qué se fue, si sabés.</p>
           <form onSubmit={submitDinero} className="space-y-3">
             <div><Label>Fecha</Label><Input type="date" value={formDinero.fecha} onChange={e => setFormDinero(f => ({ ...f, fecha: e.target.value }))} /></div>
             <div><Label>Monto</Label><Input type="number" step="0.01" value={formDinero.monto} onChange={e => setFormDinero(f => ({ ...f, monto: parseFloat(e.target.value) || 0 }))} required /></div>
+            <div><Label>¿En qué se fue? (opcional)</Label>
+              <Select value={formDinero.categoria || 'sin'} onValueChange={v => setFormDinero(f => ({ ...f, categoria: v === 'sin' ? '' : v }))}>
+                <SelectTrigger><SelectValue placeholder="Elegir categoría" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="sin">Sin categoría</SelectItem>
+                  {categorias.map(c => <SelectItem key={c.id} value={c.nombre}>{c.nombre}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              <div className="flex gap-2 mt-1">
+                <Input placeholder="Nueva categoría" value={nuevaCategoria} onChange={e => setNuevaCategoria(e.target.value)} className="text-xs" />
+                <Button type="button" variant="outline" size="sm" onClick={addCategoria}>+</Button>
+              </div>
+            </div>
             <div><Label>Medio de pago</Label>
               <Select value={formDinero.medio_pago} onValueChange={v => setFormDinero(f => ({ ...f, medio_pago: v }))}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
@@ -195,14 +226,14 @@ export default function Sueldo() {
 
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-medium">Historial</h2>
-        <Button variant="outline" size="sm" onClick={() => exportToCSV(retiros.map(r => ({ Fecha: r.fecha, Tipo: r.tipo, Monto: r.monto, Producto: r.productos?.nombre, Cantidad: r.cantidad_producto, Notas: r.notas })), 'sueldo')}><Download className="w-4 h-4" /></Button>
+        <Button variant="outline" size="sm" onClick={() => exportToCSV(retiros.map(r => ({ Fecha: r.fecha, Tipo: r.tipo, Monto: r.monto, Categoria: r.categoria, Producto: r.productos?.nombre, Cantidad: r.cantidad_producto, Notas: r.notas })), 'sueldo')}><Download className="w-4 h-4" /></Button>
       </div>
 
       <div className="space-y-2">
         {retiros.map(r => (
           <div key={r.id} className="bg-card rounded-lg border p-3 flex items-center justify-between gap-2">
             <div className="flex-1 min-w-0">
-              <p className="font-medium text-sm">{r.tipo === 'dinero' ? 'Retiro en dinero' : `${r.productos?.nombre} (×${r.cantidad_producto})`}</p>
+              <p className="font-medium text-sm">{r.tipo === 'dinero' ? (r.categoria || 'Retiro en dinero') : `${r.productos?.nombre} (×${r.cantidad_producto})`}</p>
               <p className="text-xs text-muted-foreground">{formatDate(r.fecha)} · {r.tipo === 'dinero' ? r.medio_pago : 'mercadería'}{r.notas ? ` · ${r.notas}` : ''}</p>
             </div>
             <p className="font-semibold text-sm shrink-0">{formatCurrency(Number(r.monto))}</p>

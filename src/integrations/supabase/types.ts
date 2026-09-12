@@ -961,6 +961,7 @@ export type Database = {
       sueldo_retiros: {
         Row: {
           cantidad_producto: number | null
+          categoria: string | null
           created_at: string
           fecha: string
           id: string
@@ -973,6 +974,7 @@ export type Database = {
         }
         Insert: {
           cantidad_producto?: number | null
+          categoria?: string | null
           created_at?: string
           fecha?: string
           id?: string
@@ -985,6 +987,7 @@ export type Database = {
         }
         Update: {
           cantidad_producto?: number | null
+          categoria?: string | null
           created_at?: string
           fecha?: string
           id?: string

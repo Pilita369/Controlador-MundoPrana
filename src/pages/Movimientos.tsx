@@ -143,18 +143,20 @@ export default function Movimientos() {
       linked_transfer_id: form.vincularCon || null,
     };
 
+    let idPropio = editId;
     if (editId) {
       const { error } = await supabase.from('movimientos').update(payload).eq('id', editId);
       if (error) { toast.error(error.message); return; }
       toast.success('Movimiento actualizado');
     } else {
-      const { error } = await supabase.from('movimientos').insert({ user_id: user!.id, ...payload });
+      const { data, error } = await supabase.from('movimientos').insert({ user_id: user!.id, ...payload }).select('id').single();
       if (error) { toast.error(error.message); return; }
+      idPropio = data.id;
       toast.success('Movimiento registrado');
     }
     // Vincular en ambos sentidos si se eligió "es la misma plata que..."
-    if (form.vincularCon) {
-      await supabase.from('movimientos').update({ linked_transfer_id: editId ?? null }).eq('id', form.vincularCon);
+    if (form.vincularCon && idPropio) {
+      await supabase.from('movimientos').update({ linked_transfer_id: idPropio }).eq('id', form.vincularCon);
     }
     setOpen(false);
     load();

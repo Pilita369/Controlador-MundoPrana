@@ -33,7 +33,7 @@ interface Producto {
   minutos_por_unidad: number | null; costo_packaging: number | null;
 }
 
-const RUBRO_LABEL: Record<string, string> = { carnes: 'Carnes', verduras: 'Verduras', lacteos: 'Lácteos', granel: 'A granel', otros: 'Otros' };
+const RUBRO_LABEL: Record<string, string> = { carnes: 'Carnes', verduras: 'Verduras', lacteos: 'Lácteos', granel: 'A granel', mayorista: 'Mayorista (Makro)', otros: 'Otros' };
 interface Movimiento { id: string; tipo: string; cantidad: number; notas: string | null; created_at: string; productos: { nombre: string } | null; }
 
 const base = { nombre: '', tipo: 'fresco', precio_costo: 0, precio_venta: 0, porcentaje_ganancia: 0, precio_venta_manual: true, stock_actual: 0, alerta_stock_bajo: 5, activo: true, categoria: '', linea: 'carta_fija' as Linea, rubro: '', unidad_uso: '', equivalencia_uso: 0, minutos_por_unidad: '', costo_packaging: '' };
@@ -113,7 +113,7 @@ export default function Productos() {
     .filter(p => claseDe(p) === claseTab)
     .filter(p => tabDef.linea == null || lineaDe(p) === tabDef.linea);
   const chips = esMateria
-    ? ['carnes', 'verduras', 'lacteos', 'granel', 'otros'].filter(r => enTab.some(p => p.rubro === r)).map(r => ({ v: r, l: RUBRO_LABEL[r] }))
+    ? ['carnes', 'verduras', 'lacteos', 'granel', 'mayorista', 'otros'].filter(r => enTab.some(p => p.rubro === r)).map(r => ({ v: r, l: RUBRO_LABEL[r] }))
     : ['carne', 'vegetariano', 'vegano'].filter(c => enTab.some(p => p.categoria === c)).map(c => ({ v: c, l: c === 'carne' ? 'Carne' : c === 'vegano' ? 'Vegano' : 'Vegetariano' }));
   const listaFiltrada = enTab
     .filter(p => !filtroCat || (esMateria ? p.rubro === filtroCat : p.categoria === filtroCat))

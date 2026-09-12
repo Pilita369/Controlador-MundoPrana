@@ -17,7 +17,7 @@ const CHART_TOOLTIP = { background: 'hsl(var(--popover))', border: '1px solid hs
 interface StockBajo { id: string; nombre: string; stock_actual: number; alerta_stock_bajo: number; unidad_medida: string; rubro: string | null; clase: string; linea: string; }
 interface MovimientoResumen { categoria: string; direccion: string; total: number; count: number; }
 
-const RUBRO_LABEL: Record<string, string> = { carnes: 'Carnes', verduras: 'Verduras', lacteos: 'Lácteos', granel: 'A granel', otros: 'Otros' };
+const RUBRO_LABEL: Record<string, string> = { carnes: 'Carnes', verduras: 'Verduras', lacteos: 'Lácteos', granel: 'A granel', mayorista: 'Mayorista (Makro)', otros: 'Otros' };
 
 // Categorias de "movimientos" que se muestran aparte (Facu/alquiler y envios), el resto va a la lista generica
 const CATEGORIAS_APARTE = ['movimiento_facundo', 'alquiler', 'envio_cobrado'];

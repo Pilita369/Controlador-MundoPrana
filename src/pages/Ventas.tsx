@@ -1084,6 +1084,11 @@ export default function Ventas() {
               </button>
               {abierto && (
                 <div className="border-t divide-y">
+                  <div className="p-2">
+                    <Button variant="outline" size="sm" className="w-full" onClick={() => openNuevoParaMes(mes.key)}>
+                      <Plus className="w-3.5 h-3.5 mr-1" /> Agregar venta a {mes.label}
+                    </Button>
+                  </div>
                   {mes.mensualidad.length > 0 && (
                     <div className="divide-y">
                       <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide px-3 pt-2 pb-1">Mensualidad</p>
@@ -1172,12 +1177,6 @@ export default function Ventas() {
                       })}
                     </div>
                   )}
-
-                  <div className="p-2">
-                    <Button variant="outline" size="sm" className="w-full" onClick={() => openNuevoParaMes(mes.key)}>
-                      <Plus className="w-3.5 h-3.5 mr-1" /> Agregar venta a {mes.label}
-                    </Button>
-                  </div>
                 </div>
               )}
             </div>

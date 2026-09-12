@@ -18,6 +18,8 @@ import Deudas from "@/pages/Deudas";
 import Resultado from "@/pages/Resultado";
 import Estadisticas from "@/pages/Estadisticas";
 import Clientes from "@/pages/Clientes";
+import Movimientos from "@/pages/Movimientos";
+import Ayuda from "@/pages/Ayuda";
 import Ajustes from "@/pages/Ajustes";
 import NotFound from "@/pages/NotFound";
 
@@ -58,6 +60,8 @@ const App = () => (
             <Route path="/resultado" element={<ProtectedRoute><Resultado /></ProtectedRoute>} />
             <Route path="/estadisticas" element={<ProtectedRoute><Estadisticas /></ProtectedRoute>} />
             <Route path="/clientes" element={<ProtectedRoute><Clientes /></ProtectedRoute>} />
+            <Route path="/movimientos" element={<ProtectedRoute><Movimientos /></ProtectedRoute>} />
+            <Route path="/ayuda" element={<ProtectedRoute><Ayuda /></ProtectedRoute>} />
             <Route path="/ajustes" element={<ProtectedRoute><Ajustes /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>

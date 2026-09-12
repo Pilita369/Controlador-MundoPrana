@@ -14,7 +14,7 @@ import MetricCard from '@/components/MetricCard';
 import { Plus, Download, Wallet, Package, Trash2, Edit2 } from 'lucide-react';
 import { toast } from 'sonner';
 
-interface Producto { id: string; nombre: string; precio_costo: number; stock_actual: number; }
+interface Producto { id: string; nombre: string; precio_costo: number; stock_actual: number; unidad_medida: string; }
 interface Retiro { id: string; fecha: string; tipo: string; monto: number; medio_pago: string | null; cantidad_producto: number | null; notas: string | null; producto_id: string | null; productos: { nombre: string } | null; }
 
 const emptyDinero = { fecha: new Date().toISOString().split('T')[0], monto: 0, medio_pago: 'efectivo', notas: '' };
@@ -40,7 +40,7 @@ export default function Sueldo() {
     setRetiros((data as any) ?? []);
   }
   async function loadProductos() {
-    const { data } = await supabase.from('productos').select('id, nombre, precio_costo, stock_actual').eq('user_id', user!.id).eq('activo', true);
+    const { data } = await supabase.from('productos').select('id, nombre, precio_costo, stock_actual, unidad_medida').eq('user_id', user!.id).eq('activo', true);
     setProductos(data ?? []);
   }
   async function loadMeta() {
@@ -86,7 +86,7 @@ export default function Sueldo() {
     } else {
       await supabase.from('sueldo_retiros').insert({ user_id: user!.id, tipo: 'especie', fecha: formEspecie.fecha, monto, producto_id: prod.id, cantidad_producto: formEspecie.cantidad, notas: formEspecie.notas || null });
       await supabase.from('productos').update({ stock_actual: prod.stock_actual - formEspecie.cantidad }).eq('id', prod.id);
-      await supabase.from('stock_movimientos').insert({ user_id: user!.id, producto_id: prod.id, tipo: 'retiro_duena', cantidad: -formEspecie.cantidad, notas: 'Retiro en especie' });
+      await supabase.from('stock_movimientos').insert({ user_id: user!.id, producto_id: prod.id, tipo: 'retiro_duena', cantidad: -formEspecie.cantidad, notas: 'Consumo personal / sueldo en especie' });
       toast.success('Retiro en especie registrado');
     }
     setOpenEspecie(false); load(); loadProductos();
@@ -114,7 +114,7 @@ export default function Sueldo() {
         <h1 className="text-2xl font-bold">Mi Sueldo</h1>
         <div className="flex gap-2">
           <Button size="sm" variant="outline" onClick={openNewDinero}><Wallet className="w-4 h-4 mr-1" /> Dinero</Button>
-          <Button size="sm" onClick={openNewEspecie}><Package className="w-4 h-4 mr-1" /> Especie</Button>
+          <Button size="sm" onClick={openNewEspecie}><Package className="w-4 h-4 mr-1" /> Consumo personal</Button>
         </div>
       </div>
 
@@ -144,16 +144,19 @@ export default function Sueldo() {
       {/* Modal Especie */}
       <Dialog open={openEspecie} onOpenChange={v => { setOpenEspecie(v); if (!v) setEditId(null); }}>
         <DialogContent>
-          <DialogHeader><DialogTitle>{editId ? 'Editar retiro en especie' : 'Retiro en especie'}</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{editId ? 'Editar consumo personal' : 'Consumo personal (sueldo en especie)'}</DialogTitle></DialogHeader>
+          <p className="text-xs text-muted-foreground -mt-2">Comida o mercadería del negocio que retirás para vos. Baja el stock al costo vigente; no es venta ni mueve la caja.</p>
           <form onSubmit={submitEspecie} className="space-y-3">
             <div><Label>Fecha</Label><Input type="date" value={formEspecie.fecha} onChange={e => setFormEspecie(f => ({ ...f, fecha: e.target.value }))} /></div>
             <div><Label>Producto</Label>
               <Select value={formEspecie.producto_id} onValueChange={v => setFormEspecie(f => ({ ...f, producto_id: v }))}>
                 <SelectTrigger><SelectValue placeholder="Seleccionar" /></SelectTrigger>
-                <SelectContent>{productos.map(p => <SelectItem key={p.id} value={p.id}>{p.nombre} (stock: {p.stock_actual})</SelectItem>)}</SelectContent>
+                <SelectContent>{productos.map(p => <SelectItem key={p.id} value={p.id}>{p.nombre} (stock: {p.stock_actual} {p.unidad_medida})</SelectItem>)}</SelectContent>
               </Select>
             </div>
-            <div><Label>Cantidad</Label><Input type="number" min={1} value={formEspecie.cantidad} onChange={e => setFormEspecie(f => ({ ...f, cantidad: parseInt(e.target.value) || 1 }))} /></div>
+            <div><Label>Cantidad ({productos.find(p => p.id === formEspecie.producto_id)?.unidad_medida ?? 'unidad'})</Label>
+              <Input type="number" min={0} step="0.01" value={formEspecie.cantidad} onChange={e => setFormEspecie(f => ({ ...f, cantidad: parseFloat(e.target.value) || 0 }))} />
+            </div>
             {formEspecie.producto_id && <p className="text-sm text-muted-foreground">Valor al costo: {formatCurrency((productos.find(p => p.id === formEspecie.producto_id)?.precio_costo ?? 0) * formEspecie.cantidad)}</p>}
             <div><Label>Notas</Label><Textarea value={formEspecie.notas} onChange={e => setFormEspecie(f => ({ ...f, notas: e.target.value }))} /></div>
             <Button type="submit" className="w-full">{editId ? 'Guardar cambios' : 'Registrar'}</Button>

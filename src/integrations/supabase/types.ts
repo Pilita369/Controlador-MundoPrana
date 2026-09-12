@@ -451,6 +451,8 @@ export type Database = {
       }
       movimientos: {
         Row: {
+          afecta_caja: boolean
+          afecta_resultado: boolean
           categoria: string
           cliente_id: string | null
           contraparte_nombre: string | null
@@ -468,9 +470,12 @@ export type Database = {
           notas: string | null
           proveedor_id: string | null
           referencia_externa: string | null
+          subcategoria: string | null
           user_id: string
         }
         Insert: {
+          afecta_caja?: boolean
+          afecta_resultado?: boolean
           categoria: string
           cliente_id?: string | null
           contraparte_nombre?: string | null
@@ -488,9 +493,12 @@ export type Database = {
           notas?: string | null
           proveedor_id?: string | null
           referencia_externa?: string | null
+          subcategoria?: string | null
           user_id: string
         }
         Update: {
+          afecta_caja?: boolean
+          afecta_resultado?: boolean
           categoria?: string
           cliente_id?: string | null
           contraparte_nombre?: string | null
@@ -508,6 +516,7 @@ export type Database = {
           notas?: string | null
           proveedor_id?: string | null
           referencia_externa?: string | null
+          subcategoria?: string | null
           user_id?: string
         }
         Relationships: [

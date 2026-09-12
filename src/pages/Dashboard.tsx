@@ -5,10 +5,11 @@ import { seedInitialData } from '@/hooks/useSeedData';
 import MetricCard from '@/components/MetricCard';
 import { formatCurrency } from '@/lib/format';
 import { Progress } from '@/components/ui/progress';
-import { Button } from '@/components/ui/button';
-import { ShoppingCart, Receipt, TrendingUp, Wallet, Target, CreditCard, Calendar, ChevronDown, ChevronRight, ChevronLeft, Truck, HandCoins } from 'lucide-react';
+import MesSelector, { inicioMes, rangoMes, labelMes } from '@/components/MesSelector';
+import { ShoppingCart, Receipt, TrendingUp, Wallet, Target, CreditCard, Calendar, ChevronDown, ChevronRight, Truck, HandCoins } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
 import { useNavigate } from 'react-router-dom';
+import { CATEGORIA_MOV_LABEL as CATEGORIA_MOV_LABEL_COMPLETA } from '@/lib/categoriasMovimiento';
 
 const COLORS = ['#1D9E75', '#2ab98a', '#45d4a0', '#6eeab8', '#a0f0d0', '#c4f5e0'];
 const CHART_TOOLTIP = { background: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))', borderRadius: 8, color: 'hsl(var(--popover-foreground))' };
@@ -20,28 +21,7 @@ const RUBRO_LABEL: Record<string, string> = { carnes: 'Carnes', verduras: 'Verdu
 
 // Categorias de "movimientos" que se muestran aparte (Facu/alquiler y envios), el resto va a la lista generica
 const CATEGORIAS_APARTE = ['movimiento_facundo', 'alquiler', 'envio_cobrado'];
-const CATEGORIA_MOV_LABEL: Record<string, string> = {
-  prestamo_recibido: 'Préstamo recibido',
-  pago_prestamo: 'Pago de préstamo',
-  reintegro_natura: 'Reintegro Natura',
-  movimiento_familiar: 'Movimiento familiar',
-  pendiente_clasificar: 'Pendiente de clasificar',
-  movimiento_interno: 'Movimiento interno',
-  compras_varias: 'Compras varias',
-  movimientos_varios: 'Movimientos varios',
-};
-
-function inicioMes(d: Date) { return new Date(d.getFullYear(), d.getMonth(), 1); }
-function rangoMes(d: Date) {
-  const y = d.getFullYear(), m = d.getMonth();
-  const start = `${y}-${String(m + 1).padStart(2, '0')}-01`;
-  const end = `${y}-${String(m + 1).padStart(2, '0')}-${new Date(y, m + 1, 0).getDate()}`;
-  return { start, end };
-}
-function labelMes(d: Date) {
-  const s = d.toLocaleDateString('es-AR', { month: 'long', year: 'numeric' });
-  return s.charAt(0).toUpperCase() + s.slice(1);
-}
+const CATEGORIA_MOV_LABEL = CATEGORIA_MOV_LABEL_COMPLETA;
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -183,8 +163,6 @@ export default function Dashboard() {
     return acc;
   }, {});
 
-  const esMesActual = mesSel.getFullYear() === new Date().getFullYear() && mesSel.getMonth() === new Date().getMonth();
-
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Encabezado principal con logo a la izquierda */}
@@ -202,15 +180,7 @@ export default function Dashboard() {
       </div>
 
       {/* Selector de mes: todo lo de abajo corresponde a este mes */}
-      <div className="flex items-center justify-between bg-card rounded-lg border p-2">
-        <Button variant="ghost" size="sm" onClick={() => setMesSel(m => new Date(m.getFullYear(), m.getMonth() - 1, 1))}>
-          <ChevronLeft className="w-4 h-4" />
-        </Button>
-        <span className="font-medium text-sm">{labelMes(mesSel)}</span>
-        <Button variant="ghost" size="sm" disabled={esMesActual} onClick={() => setMesSel(m => new Date(m.getFullYear(), m.getMonth() + 1, 1))}>
-          <ChevronRight className="w-4 h-4" />
-        </Button>
-      </div>
+      <MesSelector mes={mesSel} onChange={setMesSel} />
 
       {loading ? (
         <div className="flex items-center justify-center h-32">

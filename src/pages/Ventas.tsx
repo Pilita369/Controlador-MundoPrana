@@ -11,7 +11,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Download, Search, Trash2, Edit2, X, User, Tag } from 'lucide-react';
+import { Plus, Download, Search, Trash2, Edit2, X, User, Tag, ChevronDown, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { normalizarNombre } from '@/lib/importParser';
 
@@ -74,6 +74,13 @@ type EntradaLista =
 
 const mesActual = () => new Date().toISOString().slice(0, 7);
 
+const MESES_ES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+function labelMesMensualidad(mesStr: string) {
+  const [y, m] = mesStr.split('-');
+  const nombre = MESES_ES[parseInt(m, 10) - 1] ?? m;
+  return `${nombre.charAt(0).toUpperCase()}${nombre.slice(1)} ${y}`;
+}
+
 const emptyForm = {
   tipo_ingreso: 'esporadico' as TipoIngreso,
   fecha: new Date().toISOString().split('T')[0],
@@ -118,6 +125,7 @@ export default function Ventas() {
   const [buscarProducto, setBuscarProducto] = useState('');
   const [form, setForm] = useState(emptyForm);
   const [deleteTarget, setDeleteTarget] = useState<{ tipo: 'pedido' | 'legacy'; id: string } | null>(null);
+  const [clientesExpandidos, setClientesExpandidos] = useState<Set<string>>(new Set());
 
   // Form de legacy (venta individual vieja)
   const [legacyForm, setLegacyForm] = useState({
@@ -189,6 +197,30 @@ export default function Ventas() {
   function seleccionarCliente(c: Cliente) {
     setForm(f => ({ ...f, cliente_id: c.id, cliente: c.nombre, monto_mensualidad: c.monto_mensual ?? f.monto_mensualidad }));
     setBuscarCliente('');
+  }
+
+  function toggleClienteExpandido(key: string) {
+    setClientesExpandidos(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+  }
+
+  // Agregar un mes más para un cliente mensual, desde su tarjeta desplegable
+  function openNuevaMensualidadPara(grupo: { clienteId: string | null; clienteNombre: string; montoSugerido: number }) {
+    setEditPedidoId(null);
+    setEditLegacyId(null);
+    setForm({
+      ...emptyForm,
+      tipo_ingreso: 'mensualidad',
+      cliente_id: grupo.clienteId ?? '',
+      cliente: grupo.clienteNombre,
+      monto_mensualidad: grupo.montoSugerido,
+    });
+    setBuscarProducto('');
+    setBuscarCliente('');
+    setOpen(true);
   }
 
   // ── Agregar item al formulario ───────────────────────────────────────────────
@@ -501,6 +533,22 @@ export default function Ventas() {
   const { subtotal: formSubtotal, descuento_monto: formDescMonto, total: formTotal } = calcTotales(
     form.items, form.descuento_tipo, form.descuento_valor
   );
+
+  // ── Agrupar mensualidades por cliente para las tarjetas desplegables ─────────
+  const mensualidadFiltrada = pedidos.filter(p =>
+    p.tipo_ingreso === 'mensualidad' && (p.cliente ?? '').toLowerCase().includes(search.toLowerCase())
+  );
+  const gruposMap = new Map<string, { key: string; clienteId: string | null; clienteNombre: string; pedidos: Pedido[]; total: number }>();
+  mensualidadFiltrada.forEach(p => {
+    const key = p.cliente_id ?? p.cliente ?? 'sin-cliente';
+    if (!gruposMap.has(key)) gruposMap.set(key, { key, clienteId: p.cliente_id, clienteNombre: p.cliente ?? 'Sin cliente', pedidos: [], total: 0 });
+    const g = gruposMap.get(key)!;
+    g.pedidos.push(p);
+    g.total += Number(p.total);
+  });
+  const gruposMensualidad = Array.from(gruposMap.values())
+    .map(g => ({ ...g, pedidos: [...g.pedidos].sort((a, b) => (b.mes_mensualidad ?? b.fecha).localeCompare(a.mes_mensualidad ?? a.fecha)) }))
+    .sort((a, b) => (b.pedidos[0]?.fecha ?? '').localeCompare(a.pedidos[0]?.fecha ?? ''));
 
   // ── Render ────────────────────────────────────────────────────────────────────
 
@@ -883,12 +931,66 @@ export default function Ventas() {
         ))}
       </div>
 
+      {/* ── Mensualidades por cliente, en tarjetas desplegables ─────────────────── */}
+      {gruposMensualidad.length > 0 && (
+        <div className="space-y-2">
+          <h2 className="text-sm font-medium text-muted-foreground">Clientes mensuales</h2>
+          {gruposMensualidad.map(grupo => {
+            const abierto = clientesExpandidos.has(grupo.key);
+            const clienteInfo = clientes.find(c => c.id === grupo.clienteId);
+            const montoSugerido = clienteInfo?.monto_mensual ?? grupo.pedidos[0]?.total ?? 0;
+            return (
+              <div key={grupo.key} className="bg-card rounded-lg border overflow-hidden">
+                <button type="button" onClick={() => toggleClienteExpandido(grupo.key)}
+                  className="w-full flex items-center justify-between gap-2 p-3 text-left">
+                  <span className="flex items-center gap-2 min-w-0">
+                    <User className="w-4 h-4 text-muted-foreground shrink-0" />
+                    <span className="font-semibold text-sm truncate">{grupo.clienteNombre}</span>
+                    <Badge variant="secondary" className="text-xs shrink-0">{grupo.pedidos.length} {grupo.pedidos.length === 1 ? 'mes' : 'meses'}</Badge>
+                  </span>
+                  <span className="flex items-center gap-2 shrink-0">
+                    <span className="font-semibold text-sm">{formatCurrency(grupo.total)}</span>
+                    {abierto ? <ChevronDown className="w-4 h-4 text-muted-foreground" /> : <ChevronRight className="w-4 h-4 text-muted-foreground" />}
+                  </span>
+                </button>
+                {abierto && (
+                  <div className="border-t divide-y">
+                    {grupo.pedidos.map(p => (
+                      <div key={p.id} className="flex items-center justify-between gap-2 p-3">
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium">{p.mes_mensualidad ? labelMesMensualidad(p.mes_mensualidad.slice(0, 7)) : formatDate(p.fecha)}</p>
+                          <p className="text-xs text-muted-foreground">
+                            Pagado {formatDate(p.fecha)} · {p.medio_cobro}{p.notas ? ` · ${p.notas}` : ''}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <span className="font-semibold text-sm">{formatCurrency(Number(p.total))}</span>
+                          <Button variant="ghost" size="sm" onClick={() => openEditPedido(p)}><Edit2 className="w-3.5 h-3.5" /></Button>
+                          <Button variant="ghost" size="sm" onClick={() => setDeleteTarget({ tipo: 'pedido', id: p.id })} className="text-destructive hover:text-destructive"><Trash2 className="w-3.5 h-3.5" /></Button>
+                        </div>
+                      </div>
+                    ))}
+                    <div className="p-2">
+                      <Button variant="outline" size="sm" className="w-full"
+                        onClick={() => openNuevaMensualidadPara({ clienteId: grupo.clienteId, clienteNombre: grupo.clienteNombre, montoSugerido })}>
+                        <Plus className="w-3.5 h-3.5 mr-1" /> Agregar mes / corregir
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
       {/* ── Lista ────────────────────────────────────────────────────────────── */}
       <div className="space-y-2">
         {entradasFiltradas.map(entrada => {
           if (entrada.tipo === 'pedido') {
             const p = entrada.data;
             const esMensualidad = p.tipo_ingreso === 'mensualidad';
+            if (esMensualidad) return null; // ya se muestra arriba, agrupado por cliente
             const tieneDescuento = p.descuento_monto > 0;
             return (
               <div key={`pedido-${p.id}`} className="bg-card rounded-lg border p-3 space-y-2">
@@ -954,8 +1056,8 @@ export default function Ventas() {
             </div>
           );
         })}
-        {entradasFiltradas.length === 0 && (
-          <p className="text-muted-foreground text-sm text-center py-8">No hay ventas registradas</p>
+        {entradasFiltradas.filter(e => !(e.tipo === 'pedido' && e.data.tipo_ingreso === 'mensualidad')).length === 0 && (
+          <p className="text-muted-foreground text-sm text-center py-8">No hay ventas esporádicas registradas</p>
         )}
       </div>
     </div>

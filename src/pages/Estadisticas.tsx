@@ -2,14 +2,20 @@ import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { formatCurrency } from '@/lib/format';
+import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import { BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, CartesianGrid } from 'recharts';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { cargarConfigCostos, calcularCostos, type ConfigCostos } from '@/lib/costos';
 
 const COLORS = ['#1D9E75', '#2ab98a', '#45d4a0', '#6eeab8', '#a0f0d0'];
 const LINEA_LABEL: Record<string, string> = { congelados: 'Congelados', carta_fija: 'Carta fija', menu_dia: 'Menú del día', reventa: 'Productos' };
 const CAT_LABEL: Record<string, string> = { carne: 'Carne', vegetariano: 'Vegetariano', vegano: 'Vegano' };
+const MESES_CORTOS = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+const CHART_TOOLTIP = { background: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))', borderRadius: 8, color: 'hsl(var(--popover-foreground))' };
+
+interface MesCurva { mes: string; ventas: number; gastos: number; hayVentas: boolean; hayGastos: boolean; }
 
 type Periodo = 'mes' | 'mes_pasado' | 'trim' | 'anio';
 
@@ -27,6 +33,9 @@ interface VentaRow { cantidad: number; total: number; producto_id: string; produ
 export default function Estadisticas() {
   const { user } = useAuth();
   const [periodo, setPeriodo] = useState<Periodo>('mes');
+  const [anio, setAnio] = useState(() => new Date().getFullYear());
+  const [curvaMensual, setCurvaMensual] = useState<MesCurva[]>([]);
+  const [loadingCurva, setLoadingCurva] = useState(true);
   const [ventas, setVentas] = useState<VentaRow[]>([]);
   const [productos, setProductos] = useState<any[]>([]);
   const [cfg, setCfg] = useState<ConfigCostos | null>(null);
@@ -34,6 +43,31 @@ export default function Estadisticas() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => { if (user) load(); }, [user, periodo]);
+  useEffect(() => { if (user) loadCurvaMensual(); }, [user, anio]);
+
+  // Ventas y gastos por mes de todo el año, para poder comparar un mes con otro.
+  // Ventas = pedidos confirmados (esporadicos + mensualidad); no depende de tener el detalle
+  // de producto cargado, así que incluye tambien las ventas "por categoria" sin items.
+  async function loadCurvaMensual() {
+    setLoadingCurva(true);
+    const inicioAnio = `${anio}-01-01`;
+    const finAnio = `${anio}-12-31`;
+    const [pedRes, gastRes] = await Promise.all([
+      supabase.from('pedidos').select('fecha, total').eq('user_id', user!.id).eq('estado_confirmacion', 'confirmado').gte('fecha', inicioAnio).lte('fecha', finAnio),
+      supabase.from('gastos').select('fecha, monto').eq('user_id', user!.id).eq('tipo', 'negocio').gte('fecha', inicioAnio).lte('fecha', finAnio),
+    ]);
+    const porMes: MesCurva[] = MESES_CORTOS.map(mes => ({ mes, ventas: 0, gastos: 0, hayVentas: false, hayGastos: false }));
+    (pedRes.data ?? []).forEach((p: any) => {
+      const m = parseInt(p.fecha.slice(5, 7), 10) - 1;
+      if (porMes[m]) { porMes[m].ventas += Number(p.total); porMes[m].hayVentas = true; }
+    });
+    (gastRes.data ?? []).forEach((g: any) => {
+      const m = parseInt(g.fecha.slice(5, 7), 10) - 1;
+      if (porMes[m]) { porMes[m].gastos += Number(g.monto); porMes[m].hayGastos = true; }
+    });
+    setCurvaMensual(porMes);
+    setLoadingCurva(false);
+  }
 
   async function load() {
     setLoading(true);
@@ -114,10 +148,57 @@ export default function Estadisticas() {
         </Select>
       </div>
 
+      {/* Curvas mensuales: ventas y gastos, mes a mes, para comparar contra otros meses */}
+      <section className="bg-card rounded-lg border p-4 space-y-3">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-medium">Ventas por mes</h3>
+          <div className="flex items-center gap-1">
+            <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setAnio(a => a - 1)}><ChevronLeft className="w-4 h-4" /></Button>
+            <span className="text-sm font-medium w-12 text-center">{anio}</span>
+            <Button variant="ghost" size="sm" className="h-7 w-7 p-0" disabled={anio >= new Date().getFullYear()} onClick={() => setAnio(a => a + 1)}><ChevronRight className="w-4 h-4" /></Button>
+          </div>
+        </div>
+        {loadingCurva ? (
+          <p className="text-muted-foreground text-sm text-center py-8">Cargando...</p>
+        ) : curvaMensual.every(m => !m.hayVentas) ? (
+          <p className="text-muted-foreground text-xs text-center py-6">Sin ventas cargadas en {anio}</p>
+        ) : (
+          <ResponsiveContainer width="100%" height={200}>
+            <LineChart data={curvaMensual.map(m => ({ ...m, ventas: m.hayVentas ? m.ventas : null }))}>
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+              <XAxis dataKey="mes" fontSize={12} tick={{ fill: 'hsl(var(--muted-foreground))' }} />
+              <YAxis fontSize={12} tick={{ fill: 'hsl(var(--muted-foreground))' }} tickFormatter={v => `${(v / 1000).toFixed(0)}k`} />
+              <Tooltip contentStyle={CHART_TOOLTIP} formatter={(v: number) => v == null ? 'Sin datos' : formatCurrency(v)} />
+              <Line type="monotone" dataKey="ventas" stroke="#1D9E75" strokeWidth={2} dot={{ r: 3 }} connectNulls={false} />
+            </LineChart>
+          </ResponsiveContainer>
+        )}
+      </section>
+
+      <section className="bg-card rounded-lg border p-4 space-y-3">
+        <h3 className="text-sm font-medium">Gastos del negocio por mes</h3>
+        {loadingCurva ? (
+          <p className="text-muted-foreground text-sm text-center py-8">Cargando...</p>
+        ) : curvaMensual.every(m => !m.hayGastos) ? (
+          <p className="text-muted-foreground text-xs text-center py-6">Sin gastos cargados en {anio}</p>
+        ) : (
+          <ResponsiveContainer width="100%" height={200}>
+            <LineChart data={curvaMensual.map(m => ({ ...m, gastos: m.hayGastos ? m.gastos : null }))}>
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+              <XAxis dataKey="mes" fontSize={12} tick={{ fill: 'hsl(var(--muted-foreground))' }} />
+              <YAxis fontSize={12} tick={{ fill: 'hsl(var(--muted-foreground))' }} tickFormatter={v => `${(v / 1000).toFixed(0)}k`} />
+              <Tooltip contentStyle={CHART_TOOLTIP} formatter={(v: number) => v == null ? 'Sin datos' : formatCurrency(v)} />
+              <Line type="monotone" dataKey="gastos" stroke="hsl(var(--destructive))" strokeWidth={2} dot={{ r: 3 }} connectNulls={false} />
+            </LineChart>
+          </ResponsiveContainer>
+        )}
+        <p className="text-xs text-muted-foreground">Compras de materia prima incluidas si se cargaron como gasto de negocio. Un mes sin marca no tiene datos cargados (no es lo mismo que $0).</p>
+      </section>
+
       {loading ? (
-        <p className="text-muted-foreground text-sm text-center py-8">Cargando...</p>
+        <p className="text-muted-foreground text-sm text-center py-8">Cargando el detalle del período...</p>
       ) : ventas.length === 0 ? (
-        <p className="text-muted-foreground text-sm text-center py-8">No hay ventas en este período</p>
+        <p className="text-muted-foreground text-sm text-center py-8">No hay ventas con detalle de producto en este período (puede haber ventas "por categoría" que no aparecen acá, pero sí en las curvas de arriba).</p>
       ) : (
         <>
           <section className="bg-card rounded-lg border p-4 space-y-2">

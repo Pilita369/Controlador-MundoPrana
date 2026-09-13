@@ -1,6 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 
-export type FuentePrecio = 'manual' | 'texto' | 'ticket' | 'voz' | 'import' | 'produccion';
+export type FuentePrecio = 'manual' | 'texto' | 'ticket' | 'voz' | 'import' | 'produccion' | 'receta';
 
 // Actualiza el costo de un producto y deja el valor anterior en precios_historial.
 // No hace nada si el precio no cambió.

@@ -827,6 +827,7 @@ export type Database = {
           precio_costo: number
           precio_venta: number
           precio_venta_manual: boolean
+          rinde_cantidad: number
           rubro: string | null
           stock_actual: number
           tipo: string
@@ -852,6 +853,7 @@ export type Database = {
           precio_costo?: number
           precio_venta?: number
           precio_venta_manual?: boolean
+          rinde_cantidad?: number
           rubro?: string | null
           stock_actual?: number
           tipo: string
@@ -877,6 +879,7 @@ export type Database = {
           precio_costo?: number
           precio_venta?: number
           precio_venta_manual?: boolean
+          rinde_cantidad?: number
           rubro?: string | null
           stock_actual?: number
           tipo?: string
@@ -919,6 +922,57 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      receta_items: {
+        Row: {
+          cantidad: number | null
+          created_at: string
+          id: string
+          ingrediente_id: string | null
+          nombre_libre: string | null
+          orden: number
+          producto_id: string
+          unidad: string | null
+          user_id: string
+        }
+        Insert: {
+          cantidad?: number | null
+          created_at?: string
+          id?: string
+          ingrediente_id?: string | null
+          nombre_libre?: string | null
+          orden?: number
+          producto_id: string
+          unidad?: string | null
+          user_id: string
+        }
+        Update: {
+          cantidad?: number | null
+          created_at?: string
+          id?: string
+          ingrediente_id?: string | null
+          nombre_libre?: string | null
+          orden?: number
+          producto_id?: string
+          unidad?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "receta_items_ingrediente_id_fkey"
+            columns: ["ingrediente_id"]
+            isOneToOne: false
+            referencedRelation: "productos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "receta_items_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "productos"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       stock_movimientos: {
         Row: {

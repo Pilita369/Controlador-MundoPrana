@@ -5,12 +5,14 @@ import { formatCurrency } from '@/lib/format';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Search, Settings2 } from 'lucide-react';
+import { Search, Settings2, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
+import { calcularCostoItem, type ProductoParaCosto } from '@/lib/produccion';
+import { actualizarPrecioCosto } from '@/lib/precios';
 import {
   cargarConfigCostos, calcularCostos, LABEL_NIVEL_COSTO,
   type ConfigCostos, type DesgloseCostos,
@@ -19,10 +21,25 @@ import {
 interface ProductoCosto {
   id: string; nombre: string; linea: string; categoria: string | null;
   precio_costo: number; precio_venta: number; costo_packaging: number | null;
-  minutos_por_unidad: number | null;
+  minutos_por_unidad: number | null; rinde_cantidad: number;
 }
 
+interface Ingrediente extends ProductoParaCosto { id: string; nombre: string; }
+
+interface FilaReceta {
+  _key: string;
+  ingredienteId: string;
+  nombre: string;
+  cantidad: number | '';
+  unidad: string;
+  costo: number | null;
+}
+
+let contador = 0;
+const nuevoKey = () => `r${++contador}`;
+
 const LINEA_LABEL: Record<string, string> = { congelados: 'Congelados', carta_fija: 'Carta fija', menu_dia: 'Menú del día', reventa: 'Productos' };
+const UNIDADES_SELECT = ['kg', 'g', 'litro', 'ml', 'unidad', 'docena', 'maple', 'paquete', 'porción'];
 
 function colorMargen(pct: number | null): string {
   if (pct == null) return 'text-muted-foreground';
@@ -36,21 +53,29 @@ export default function Costos() {
   const navigate = useNavigate();
   const [cfg, setCfg] = useState<ConfigCostos | null>(null);
   const [productos, setProductos] = useState<ProductoCosto[]>([]);
+  const [ingredientes, setIngredientes] = useState<Ingrediente[]>([]);
   const [busqueda, setBusqueda] = useState('');
   const [filtroLinea, setFiltroLinea] = useState('todos');
   const [sel, setSel] = useState<ProductoCosto | null>(null);
-  const [edit, setEdit] = useState({ minutos_por_unidad: '', costo_packaging: '' });
+  const [edit, setEdit] = useState({ minutos_por_unidad: '', costo_packaging: '', precio_venta: '', precio_costo: '' });
+  const [rinde, setRinde] = useState('1');
+  const [recetaFilas, setRecetaFilas] = useState<FilaReceta[]>([]);
+  const [buscarIngrediente, setBuscarIngrediente] = useState('');
+  const [guardando, setGuardando] = useState(false);
 
   useEffect(() => { if (user) load(); }, [user]);
 
   async function load() {
-    const [c, p] = await Promise.all([
+    const [c, p, ing] = await Promise.all([
       cargarConfigCostos(user!.id),
-      supabase.from('productos').select('id, nombre, linea, categoria, precio_costo, precio_venta, costo_packaging, minutos_por_unidad')
+      supabase.from('productos').select('id, nombre, linea, categoria, precio_costo, precio_venta, costo_packaging, minutos_por_unidad, rinde_cantidad')
         .match({ user_id: user!.id, clase: 'elaborado', activo: true }).order('nombre'),
+      supabase.from('productos').select('id, nombre, unidad_medida, unidad_uso, equivalencia_uso, precio_costo')
+        .eq('user_id', user!.id).eq('activo', true).in('clase', ['materia_prima', 'base']).order('nombre'),
     ]);
     setCfg(c);
     setProductos((p.data as any) ?? []);
+    setIngredientes((ing.data as any) ?? []);
   }
 
   const filas = useMemo(() => {
@@ -65,36 +90,110 @@ export default function Costos() {
       });
   }, [productos, cfg, busqueda, filtroLinea]);
 
-  function abrir(p: ProductoCosto) {
+  function recalcularFilaReceta(f: FilaReceta): FilaReceta {
+    const ing = ingredientes.find(i => i.id === f.ingredienteId);
+    if (!ing || f.cantidad === '') return { ...f, costo: null };
+    const { costo } = calcularCostoItem(Number(f.cantidad), f.unidad || undefined, ing);
+    return { ...f, costo };
+  }
+
+  async function abrir(p: ProductoCosto) {
     setSel(p);
     setEdit({
       minutos_por_unidad: p.minutos_por_unidad != null ? String(p.minutos_por_unidad) : '',
       costo_packaging: p.costo_packaging != null ? String(p.costo_packaging) : '',
+      precio_venta: p.precio_venta ? String(p.precio_venta) : '',
+      precio_costo: p.precio_costo ? String(p.precio_costo) : '',
     });
+    setRinde(String(p.rinde_cantidad || 1));
+    setBuscarIngrediente('');
+    const { data } = await supabase.from('receta_items').select('*').eq('producto_id', p.id).order('orden');
+    setRecetaFilas(((data as any[]) ?? []).map(it => recalcularFilaReceta({
+      _key: nuevoKey(),
+      ingredienteId: it.ingrediente_id ?? '',
+      nombre: ingredientes.find(i => i.id === it.ingrediente_id)?.nombre ?? it.nombre_libre ?? '',
+      cantidad: it.cantidad ?? '',
+      unidad: it.unidad ?? '',
+      costo: null,
+    })));
   }
 
-  async function guardarEdit() {
-    if (!sel) return;
-    const { error } = await supabase.from('productos').update({
-      minutos_por_unidad: edit.minutos_por_unidad ? parseFloat(edit.minutos_por_unidad) : null,
-      costo_packaging: edit.costo_packaging ? parseFloat(edit.costo_packaging) : null,
-    }).eq('id', sel.id);
-    if (error) { toast.error(error.message); return; }
-    toast.success('Guardado');
-    setSel(null); load();
+  function agregarIngrediente(ing: Ingrediente) {
+    if (recetaFilas.some(f => f.ingredienteId === ing.id)) { setBuscarIngrediente(''); return; }
+    const fila: FilaReceta = { _key: nuevoKey(), ingredienteId: ing.id, nombre: ing.nombre, cantidad: 1, unidad: ing.unidad_uso ?? ing.unidad_medida, costo: null };
+    setRecetaFilas(fs => [...fs, recalcularFilaReceta(fila)]);
+    setBuscarIngrediente('');
+  }
+  function editarFilaReceta(key: string, campos: Partial<FilaReceta>) {
+    setRecetaFilas(fs => fs.map(f => f._key === key ? recalcularFilaReceta({ ...f, ...campos }) : f));
+  }
+  function quitarFilaReceta(key: string) {
+    setRecetaFilas(fs => fs.filter(f => f._key !== key));
   }
 
-  async function usarSugerido(p: ProductoCosto, sugerido: number) {
-    const { error } = await supabase.from('productos').update({ precio_venta: sugerido, precio_venta_manual: true }).eq('id', p.id);
-    if (error) { toast.error(error.message); return; }
-    toast.success(`Precio de ${p.nombre}: ${formatCurrency(sugerido)}`);
-    load();
+  const rindeNum = parseFloat(rinde) || 1;
+  const tieneReceta = recetaFilas.length > 0;
+  const costoRecetaTotal = recetaFilas.reduce((s, f) => s + (f.costo ?? 0), 0);
+  const ingredientesCalculados = tieneReceta ? costoRecetaTotal / rindeNum : null;
+
+  const selEfectivo = sel ? {
+    precio_costo: ingredientesCalculados ?? (parseFloat(edit.precio_costo) || 0),
+    costo_packaging: edit.costo_packaging ? parseFloat(edit.costo_packaging) : null,
+    minutos_por_unidad: edit.minutos_por_unidad ? parseFloat(edit.minutos_por_unidad) : null,
+    precio_venta: edit.precio_venta ? parseFloat(edit.precio_venta) : 0,
+  } : null;
+  const selDesglose = selEfectivo && cfg ? calcularCostos(selEfectivo, cfg) : null;
+
+  async function guardarTodo() {
+    if (!sel || !user) return;
+    setGuardando(true);
+    try {
+      // 1) Receta: se reemplaza entera (simple y sin riesgo de quedar filas viejas colgadas)
+      await supabase.from('receta_items').delete().eq('producto_id', sel.id);
+      const conIngrediente = recetaFilas.filter(f => f.ingredienteId && f.cantidad !== '');
+      if (conIngrediente.length > 0) {
+        await supabase.from('receta_items').insert(conIngrediente.map((f, i) => ({
+          user_id: user.id, producto_id: sel.id, ingrediente_id: f.ingredienteId,
+          cantidad: Number(f.cantidad), unidad: f.unidad || null, orden: i,
+        })));
+      }
+
+      // 2) Costo de ingredientes: el de la receta si hay, si no el que se haya tipeado a mano
+      const nuevoPrecioCosto = ingredientesCalculados ?? (parseFloat(edit.precio_costo) || 0);
+      if (nuevoPrecioCosto > 0) {
+        await actualizarPrecioCosto(user.id, sel.id, Math.round(nuevoPrecioCosto * 100) / 100, 'receta');
+      }
+
+      // 3) El resto de los campos del producto
+      const { error } = await supabase.from('productos').update({
+        minutos_por_unidad: edit.minutos_por_unidad ? parseFloat(edit.minutos_por_unidad) : null,
+        costo_packaging: edit.costo_packaging ? parseFloat(edit.costo_packaging) : null,
+        precio_venta: edit.precio_venta ? parseFloat(edit.precio_venta) : sel.precio_venta,
+        precio_venta_manual: true,
+        rinde_cantidad: rindeNum,
+      }).eq('id', sel.id);
+      if (error) throw error;
+
+      toast.success('Guardado');
+      setSel(null); load();
+    } catch (err: any) {
+      toast.error(err?.message ?? 'No se pudo guardar');
+    } finally {
+      setGuardando(false);
+    }
   }
 
-  const selDesglose = sel && cfg ? calcularCostos(sel, cfg) : null;
+  async function usarSugerido(sugerido: number) {
+    setEdit(f => ({ ...f, precio_venta: String(sugerido) }));
+    toast.success(`Precio sugerido: ${formatCurrency(sugerido)} (guardá para confirmar)`);
+  }
 
   const revisar = filas.filter(f => f.d.margenPct != null && f.d.margenPct < 20).length;
   const sinCalcular = filas.filter(f => f.d.nivel === 'sin_calcular').length;
+
+  const candidatosIngrediente = buscarIngrediente
+    ? ingredientes.filter(i => i.nombre.toLowerCase().includes(buscarIngrediente.toLowerCase()) && !recetaFilas.some(f => f.ingredienteId === i.id)).slice(0, 6)
+    : [];
 
   return (
     <div className="space-y-4 animate-fade-in">
@@ -152,12 +251,76 @@ export default function Costos() {
         {filas.length === 0 && <p className="text-muted-foreground text-sm text-center py-8">Sin productos</p>}
       </div>
 
-      {/* Detalle / edición */}
+      {/* Detalle / edición completa */}
       <Dialog open={!!sel} onOpenChange={o => !o && setSel(null)}>
         <DialogContent className="max-h-[90vh] overflow-y-auto">
-          <DialogHeader><DialogTitle>{sel?.nombre}</DialogTitle></DialogHeader>
-          {selDesglose && (
-            <div className="space-y-3">
+          <DialogHeader>
+            <DialogTitle>{sel?.nombre}</DialogTitle>
+            <DialogDescription>Armá la receta y todo se recalcula solo, con las mismas capas de costo de siempre (ingredientes → directo → productivo → precio sugerido).</DialogDescription>
+          </DialogHeader>
+          {selDesglose && sel && (
+            <div className="space-y-4">
+              {/* Receta */}
+              <div className="space-y-2">
+                <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Receta</Label>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input placeholder="Buscar materia prima o base para agregar..." value={buscarIngrediente} onChange={e => setBuscarIngrediente(e.target.value)} className="pl-9 h-9" />
+                  {candidatosIngrediente.length > 0 && (
+                    <div className="border rounded-md bg-card shadow-sm max-h-32 overflow-y-auto mt-1">
+                      {candidatosIngrediente.map(ing => (
+                        <button key={ing.id} type="button" className="w-full text-left px-3 py-2 text-sm hover:bg-muted flex justify-between items-center" onClick={() => agregarIngrediente(ing)}>
+                          <span>{ing.nombre}</span>
+                          <span className="text-xs text-muted-foreground">{formatCurrency(ing.precio_costo)}/{ing.unidad_uso ?? ing.unidad_medida}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {recetaFilas.length > 0 && (
+                  <div className="space-y-1.5">
+                    {recetaFilas.map(f => (
+                      <div key={f._key} className="flex items-center gap-1.5">
+                        <span className="text-xs flex-1 truncate">{f.nombre}</span>
+                        <Input type="number" step="0.01" value={f.cantidad}
+                          onChange={e => editarFilaReceta(f._key, { cantidad: e.target.value === '' ? '' : parseFloat(e.target.value) })}
+                          className="h-8 w-16 text-xs" />
+                        <Select value={f.unidad || 'ninguna'} onValueChange={v => editarFilaReceta(f._key, { unidad: v === 'ninguna' ? '' : v })}>
+                          <SelectTrigger className="h-8 w-[5.5rem] text-xs"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="ninguna">-</SelectItem>
+                            {UNIDADES_SELECT.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                        <span className="text-xs text-muted-foreground w-16 text-right shrink-0">{f.costo != null ? formatCurrency(f.costo) : '—'}</span>
+                        <button type="button" onClick={() => quitarFilaReceta(f._key)} className="text-muted-foreground hover:text-destructive p-1 shrink-0"><X className="w-3.5 h-3.5" /></button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <div className="grid grid-cols-2 gap-3 pt-1">
+                  <div>
+                    <Label className="text-xs">Rinde (cuántas unidades da)</Label>
+                    <Input type="number" step="0.01" min={0.01} value={rinde} onChange={e => setRinde(e.target.value)} />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Costo ingredientes {tieneReceta ? '(de la receta)' : '(manual)'}</Label>
+                    <Input type="number" step="0.01" disabled={tieneReceta}
+                      value={tieneReceta ? (ingredientesCalculados ?? 0).toFixed(2) : edit.precio_costo}
+                      onChange={e => setEdit(f => ({ ...f, precio_costo: e.target.value }))}
+                      placeholder="por unidad" />
+                  </div>
+                </div>
+                {tieneReceta && (
+                  <p className="text-xs text-muted-foreground">
+                    {formatCurrency(costoRecetaTotal)} en total ÷ {rindeNum} = {formatCurrency(ingredientesCalculados ?? 0)} por unidad.
+                  </p>
+                )}
+              </div>
+
+              {/* Desglose completo */}
               <div className="bg-muted/50 rounded-lg p-3 space-y-1 text-sm">
                 <Fila l="Ingredientes" v={selDesglose.ingredientes} />
                 <Fila l={`Menores (${cfg?.menores_pct}%)`} v={selDesglose.menores} />
@@ -165,28 +328,31 @@ export default function Costos() {
                 <div className="flex justify-between font-medium border-t pt-1"><span>Costo directo</span><span>{formatCurrency(selDesglose.costoDirecto)}</span></div>
                 <Fila l={selDesglose.productivoEsFallback ? `Productivo (respaldo ${cfg?.fallback_productivo_pct}%)` : 'Productivo (gas/luz/mano de obra)'} v={selDesglose.productivoExtra} />
                 <div className="flex justify-between font-semibold border-t pt-1"><span>Costo productivo</span><span>{formatCurrency(selDesglose.costoProductivo)}</span></div>
-                <div className="flex justify-between border-t pt-1"><span className="text-muted-foreground">Precio de venta</span><span>{selDesglose.precioVenta > 0 ? formatCurrency(selDesglose.precioVenta) : '—'}</span></div>
                 <div className="flex justify-between font-medium"><span>Margen</span><span className={colorMargen(selDesglose.margenPct)}>{selDesglose.margen != null ? `${formatCurrency(selDesglose.margen)} · ${selDesglose.margenPct!.toFixed(0)}%` : 'sin datos'}</span></div>
                 {selDesglose.precioSugerido != null && (
                   <div className="flex justify-between items-center border-t pt-1">
                     <span className="text-muted-foreground">Precio sugerido</span>
                     <span className="flex items-center gap-2">{formatCurrency(selDesglose.precioSugerido)}
-                      <Button size="sm" variant="outline" className="h-6 text-xs" onClick={() => { usarSugerido(sel!, selDesglose.precioSugerido!); setSel(null); }}>Usar</Button>
+                      <Button size="sm" variant="outline" className="h-6 text-xs" onClick={() => usarSugerido(selDesglose.precioSugerido!)}>Usar</Button>
                     </span>
                   </div>
                 )}
               </div>
 
+              {/* Todo lo demás, editable */}
               <div className="grid grid-cols-2 gap-3">
-                <div><Label className="text-xs">Minutos por unidad</Label>
-                  <Input type="number" step="0.5" value={edit.minutos_por_unidad} onChange={e => setEdit(f => ({ ...f, minutos_por_unidad: e.target.value }))} placeholder="opcional" />
+                <div><Label className="text-xs">Precio de venta</Label>
+                  <Input type="number" step="1" value={edit.precio_venta} onChange={e => setEdit(f => ({ ...f, precio_venta: e.target.value }))} placeholder="0" />
                 </div>
                 <div><Label className="text-xs">Packaging por unidad</Label>
                   <Input type="number" step="0.01" value={edit.costo_packaging} onChange={e => setEdit(f => ({ ...f, costo_packaging: e.target.value }))} placeholder="opcional" />
                 </div>
+                <div className="col-span-2"><Label className="text-xs">Minutos por unidad</Label>
+                  <Input type="number" step="0.5" value={edit.minutos_por_unidad} onChange={e => setEdit(f => ({ ...f, minutos_por_unidad: e.target.value }))} placeholder="opcional" />
+                </div>
               </div>
-              <p className="text-xs text-muted-foreground">Si cargás los minutos, el costo productivo se calcula con gas/luz y mano de obra en vez del % de respaldo. El costo de ingredientes se ajusta desde Producción o editando el producto.</p>
-              <Button className="w-full" onClick={guardarEdit}>Guardar</Button>
+              <p className="text-xs text-muted-foreground">Si cargás los minutos, el costo productivo se calcula con gas/luz y mano de obra en vez del % de respaldo (eso se ajusta en Configuración).</p>
+              <Button className="w-full" onClick={guardarTodo} disabled={guardando}>{guardando ? 'Guardando...' : 'Guardar todo'}</Button>
             </div>
           )}
         </DialogContent>

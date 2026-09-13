@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { seedInitialData } from '@/hooks/useSeedData';
 import MetricCard from '@/components/MetricCard';
 import { formatCurrency } from '@/lib/format';
 import { Progress } from '@/components/ui/progress';
@@ -48,7 +47,6 @@ export default function Dashboard() {
   // El stock es estado actual, no depende del mes que se esté mirando: se carga una sola vez.
   useEffect(() => {
     if (!user) return;
-    seedInitialData(user.id);
     supabase.from('productos')
       .select('id, nombre, stock_actual, alerta_stock_bajo, unidad_medida, rubro, clase, linea')
       .match({ user_id: user.id, activo: true }).gt('alerta_stock_bajo', 0)

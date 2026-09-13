@@ -203,9 +203,12 @@ export default function Costos() {
       </div>
 
       {cfg && (
-        <p className="text-xs text-muted-foreground">
-          Menores {cfg.menores_pct}% · respaldo productivo {cfg.fallback_productivo_pct}% · markup sugerido {cfg.markup_default}%
-        </p>
+        <div className="bg-card rounded-lg border p-3 text-xs text-muted-foreground space-y-1">
+          <p><b className="text-foreground">Directo</b> = costo de ingredientes (de la receta, o cargado a mano) + menores ({cfg.menores_pct}%) + packaging.</p>
+          <p><b className="text-foreground">Productivo</b> = directo + minutos × gas/luz/mano de obra, o el {cfg.fallback_productivo_pct}% de respaldo si no cargaste minutos (marcado con *).</p>
+          <p><b className="text-foreground">Venta</b> = el precio que tenés cargado en Productos, tal cual.</p>
+          <p><b className="text-foreground">Sugerido</b> = productivo + tu markup configurado ({cfg.markup_default}%). Tocá "Configuración" para cambiar estos porcentajes.</p>
+        </div>
       )}
 
       {(revisar > 0 || sinCalcular > 0) && (
@@ -246,6 +249,15 @@ export default function Costos() {
                 {d.margen != null ? `${formatCurrency(d.margen)} (${d.margenPct!.toFixed(0)}%)` : 'sin datos'}
               </span>
             </div>
+            {d.precioSugerido != null && (
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Sugerido: <span className="font-medium text-foreground">{formatCurrency(d.precioSugerido)}</span>
+                {' '}(margen conveniente {cfg?.markup_default}%)
+                {d.precioVenta > 0 && d.precioSugerido > d.precioVenta && (
+                  <span className="text-amber-500 dark:text-amber-400"> · estás {formatCurrency(d.precioSugerido - d.precioVenta)} por debajo</span>
+                )}
+              </p>
+            )}
           </button>
         ))}
         {filas.length === 0 && <p className="text-muted-foreground text-sm text-center py-8">Sin productos</p>}

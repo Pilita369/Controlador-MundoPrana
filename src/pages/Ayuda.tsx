@@ -1,4 +1,16 @@
-import { ArrowDown, ShoppingCart, Receipt, ArrowLeftRight, Landmark, Package, Info } from 'lucide-react';
+import { ArrowDown, ArrowRight, ShoppingCart, Receipt, ArrowLeftRight, Landmark, Package, Info, Carrot, Calculator, ChefHat, TrendingUp, BarChart3, Wallet } from 'lucide-react';
+
+function Nodo({ icon: Icon, texto, sub, color = 'text-foreground' }: { icon: any; texto: string; sub?: string; color?: string }) {
+  return (
+    <div className="flex items-center gap-2.5 rounded-md border p-2.5 bg-card">
+      <Icon className={`w-4 h-4 shrink-0 ${color}`} />
+      <div className="min-w-0">
+        <p className="text-xs font-medium leading-tight">{texto}</p>
+        {sub && <p className="text-[10px] text-muted-foreground leading-tight">{sub}</p>}
+      </div>
+    </div>
+  );
+}
 
 const PASOS = [
   { icon: ShoppingCart, texto: 'Venta a un cliente', destino: 'Registrar como venta del mes', color: 'text-primary' },
@@ -25,6 +37,62 @@ export default function Ayuda() {
       <div>
         <h1 className="text-2xl font-bold">Cómo usar la aplicación</h1>
         <p className="text-muted-foreground text-sm">Guía rápida para saber dónde cargar cada movimiento.</p>
+      </div>
+
+      <div className="bg-card rounded-lg border p-4 space-y-4">
+        <p className="text-sm font-medium">Cómo se conecta todo</p>
+
+        {/* A: de la materia prima al precio */}
+        <div className="space-y-1.5">
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">De la materia prima al precio de venta</p>
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <Nodo icon={Carrot} texto="Materia prima" sub="Productos → Materia prima" />
+            <ArrowRight className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+            <Nodo icon={Calculator} texto="Receta" sub="Costos" />
+            <ArrowRight className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+            <Nodo icon={ShoppingCart} texto="Precio sugerido" sub="lo usás en Ventas" color="text-primary" />
+          </div>
+        </div>
+
+        {/* B: producción */}
+        <div className="space-y-1.5">
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Cuando cocinás</p>
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <Nodo icon={Carrot} texto="Materia prima" />
+            <ArrowRight className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+            <Nodo icon={ChefHat} texto="Producción" sub="descuenta stock" />
+            <ArrowRight className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+            <Nodo icon={Package} texto="Stock de productos" sub="lo que hay para vender" />
+          </div>
+        </div>
+
+        {/* C: del mes al resultado */}
+        <div className="space-y-1.5">
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Cada mes</p>
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <Nodo icon={ShoppingCart} texto="Ventas" sub="mensualidad + esporádicas" color="text-primary" />
+          </div>
+          <div className="flex justify-center"><ArrowDown className="w-3.5 h-3.5 text-muted-foreground" /></div>
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <Nodo icon={Receipt} texto="Gastos" sub="mercadería + otros gastos" color="text-destructive" />
+          </div>
+          <div className="flex justify-center"><ArrowDown className="w-3.5 h-3.5 text-muted-foreground" /></div>
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <Nodo icon={TrendingUp} texto="Resultado del negocio" sub="ingresos − mercadería − gastos − sueldo" />
+            <ArrowRight className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+            <Nodo icon={BarChart3} texto="Estadísticas" sub="compara un mes con otro" />
+          </div>
+        </div>
+
+        {/* D: aparte */}
+        <div className="space-y-1.5">
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Aparte — no es venta ni gasto del negocio</p>
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <Nodo icon={Wallet} texto="Mi Sueldo" sub="lo que retirás" color="text-muted-foreground" />
+            <Nodo icon={ArrowLeftRight} texto="Movimientos" sub="Facu, préstamos, inversión" color="text-muted-foreground" />
+            <Nodo icon={Landmark} texto="Deudas" sub="pagar una cuota sí es gasto" color="text-muted-foreground" />
+          </div>
+        </div>
       </div>
 
       <div className="bg-card rounded-lg border p-4 space-y-3">

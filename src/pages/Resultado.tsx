@@ -4,25 +4,26 @@ import { useAuth } from '@/hooks/useAuth';
 import { formatCurrency } from '@/lib/format';
 import { Button } from '@/components/ui/button';
 import { ChevronLeft, ChevronRight, Check, X } from 'lucide-react';
-import { cargarConfigCostos, calcularCostos, type ConfigCostos } from '@/lib/costos';
+
+// "Costo de mercadería" = lo que efectivamente compraste para producir (Gastos → Negocio,
+// en estas categorías), no una estimación por receta. Así queda atado a lo que vos cargás
+// como compra, y no depende de tener el detalle de producto en cada venta.
+const CATEGORIAS_MERCADERIA = ['Verduras', 'Carnes', 'A granel', 'Mayorista (Makro)', 'Packaging', 'Ingredientes'];
 
 interface Resumen {
   ingresosEsporadicas: number;
   ingresosMensualidad: number;
   costoMercaderia: number;
-  gastosNegocio: number;
+  gastosOtros: number;
   gastosNegocioDeuda: number;
   sueldo: number;
   gastosPersonales: number;
   compromisoDeudaMensual: number;
-  ventasSinCosto: number;
-  pedidosSinDetalle: number;
 }
 
 const NADA: Resumen = {
-  ingresosEsporadicas: 0, ingresosMensualidad: 0, costoMercaderia: 0, gastosNegocio: 0,
-  gastosNegocioDeuda: 0, sueldo: 0, gastosPersonales: 0, compromisoDeudaMensual: 0, ventasSinCosto: 0,
-  pedidosSinDetalle: 0,
+  ingresosEsporadicas: 0, ingresosMensualidad: 0, costoMercaderia: 0, gastosOtros: 0,
+  gastosNegocioDeuda: 0, sueldo: 0, gastosPersonales: 0, compromisoDeudaMensual: 0,
 };
 
 function rangoMes(d: Date) {
@@ -36,7 +37,6 @@ export default function Resultado() {
   const { user } = useAuth();
   const [mes, setMes] = useState(() => { const d = new Date(); d.setDate(1); return d; });
   const [r, setR] = useState<Resumen>(NADA);
-  const [cfg, setCfg] = useState<ConfigCostos | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => { if (user) load(); }, [user, mes]);
@@ -44,43 +44,29 @@ export default function Resultado() {
   async function load() {
     setLoading(true);
     const { s, e } = rangoMes(mes);
-    const [pedidosEspRes, ventasRes, mensRes, gnegRes, gperRes, sueldoRes, config, deudasRes] = await Promise.all([
-      supabase.from('pedidos').select('id, total').eq('user_id', user!.id).eq('tipo_ingreso', 'esporadico').eq('estado_confirmacion', 'confirmado').gte('fecha', s).lte('fecha', e),
-      supabase.from('ventas').select('pedido_id, cantidad, total, productos(precio_costo, costo_packaging, minutos_por_unidad, precio_venta)').eq('user_id', user!.id).gte('fecha', s).lte('fecha', e),
+    const [pedidosEspRes, mensRes, gnegRes, gperRes, sueldoRes, deudasRes] = await Promise.all([
+      supabase.from('pedidos').select('total').eq('user_id', user!.id).eq('tipo_ingreso', 'esporadico').eq('estado_confirmacion', 'confirmado').gte('fecha', s).lte('fecha', e),
       supabase.from('pedidos').select('total').eq('user_id', user!.id).eq('tipo_ingreso', 'mensualidad').eq('estado_confirmacion', 'confirmado').gte('fecha', s).lte('fecha', e),
-      supabase.from('gastos').select('monto, deuda_id').eq('user_id', user!.id).eq('tipo', 'negocio').gte('fecha', s).lte('fecha', e),
+      supabase.from('gastos').select('monto, deuda_id, categorias_gasto(nombre)').eq('user_id', user!.id).eq('tipo', 'negocio').gte('fecha', s).lte('fecha', e),
       supabase.from('gastos').select('monto').eq('user_id', user!.id).eq('tipo', 'personal').gte('fecha', s).lte('fecha', e),
       supabase.from('sueldo_retiros').select('monto').eq('user_id', user!.id).gte('fecha', s).lte('fecha', e),
-      cargarConfigCostos(user!.id),
       supabase.from('deudas').select('cuota_estimada, ambito').eq('user_id', user!.id).eq('activo', true),
     ]);
-    setCfg(config);
 
-    let costoMercaderia = 0, ventasSinCosto = 0;
-    (ventasRes.data ?? []).forEach((v: any) => {
-      const p = v.productos;
-      if (!p || !Number(p.precio_costo)) { ventasSinCosto += 1; return; }
-      const d = calcularCostos(p, config);
-      costoMercaderia += d.costoProductivo * Number(v.cantidad || 0);
-    });
+    const gneg = (gnegRes.data as any[]) ?? [];
+    const esMercaderia = (g: any) => CATEGORIAS_MERCADERIA.includes(g.categorias_gasto?.nombre);
+    const costoMercaderia = gneg.filter(esMercaderia).reduce((a, g) => a + Number(g.monto), 0);
+    const gastosOtros = gneg.filter(g => !esMercaderia(g)).reduce((a, g) => a + Number(g.monto), 0);
 
-    // Pedidos esporádicos cargados "por categoría" (Congelados, Menú del día, etc.) no tienen
-    // filas en `ventas`, así que su costo de mercadería no está contemplado arriba.
-    const pedidosConDetalle = new Set((ventasRes.data ?? []).map((v: any) => v.pedido_id).filter(Boolean));
-    const pedidosSinDetalle = (pedidosEspRes.data ?? []).filter((p: any) => !pedidosConDetalle.has(p.id)).length;
-
-    const gneg = gnegRes.data ?? [];
     setR({
       ingresosEsporadicas: (pedidosEspRes.data ?? []).reduce((a: number, p: any) => a + Number(p.total), 0),
       ingresosMensualidad: (mensRes.data ?? []).reduce((a: number, v: any) => a + Number(v.total), 0),
       costoMercaderia,
-      gastosNegocio: gneg.reduce((a: number, g: any) => a + Number(g.monto), 0),
+      gastosOtros,
       gastosNegocioDeuda: gneg.filter((g: any) => g.deuda_id).reduce((a: number, g: any) => a + Number(g.monto), 0),
       sueldo: (sueldoRes.data ?? []).reduce((a: number, x: any) => a + Number(x.monto), 0),
       gastosPersonales: (gperRes.data ?? []).reduce((a: number, x: any) => a + Number(x.monto), 0),
       compromisoDeudaMensual: (deudasRes.data ?? []).filter((d: any) => d.ambito !== 'personal').reduce((a: number, d: any) => a + Number(d.cuota_estimada || 0), 0),
-      ventasSinCosto,
-      pedidosSinDetalle,
     });
     setLoading(false);
   }
@@ -88,7 +74,7 @@ export default function Resultado() {
   const ingresosTotales = r.ingresosEsporadicas + r.ingresosMensualidad;
   const margenBruto = ingresosTotales - r.costoMercaderia;
   const margenBrutoPct = ingresosTotales > 0 ? (margenBruto / ingresosTotales) * 100 : null;
-  const resultadoOperativo = margenBruto - r.gastosNegocio;
+  const resultadoOperativo = margenBruto - r.gastosOtros;
   const resultadoFinal = resultadoOperativo - r.sueldo;
 
   const cubreGastos = resultadoOperativo >= 0;
@@ -117,9 +103,9 @@ export default function Resultado() {
             <Linea l="Ventas esporádicas" v={r.ingresosEsporadicas} />
             <Linea l="Mensualidades" v={r.ingresosMensualidad} />
             <Linea l="Ingresos totales" v={ingresosTotales} fuerte />
-            <Linea l="Costo de mercadería (estimado)" v={-r.costoMercaderia} />
+            <Linea l="Costo de mercadería" v={-r.costoMercaderia} sub="Verduras, carnes, a granel, mayorista y packaging cargados en Gastos → Negocio" />
             <Linea l={`Margen bruto${margenBrutoPct != null ? ` · ${margenBrutoPct.toFixed(0)}%` : ''}`} v={margenBruto} fuerte />
-            <Linea l="Gastos del negocio" v={-r.gastosNegocio} sub={r.gastosNegocioDeuda > 0 ? `incluye ${formatCurrency(r.gastosNegocioDeuda)} de cuotas de deuda` : undefined} />
+            <Linea l="Otros gastos del negocio" v={-r.gastosOtros} sub={r.gastosNegocioDeuda > 0 ? `incluye ${formatCurrency(r.gastosNegocioDeuda)} de cuotas de deuda` : 'alquiler, servicios, transporte, etc.'} />
             <Linea l="Resultado operativo" v={resultadoOperativo} fuerte />
             <Linea l="Sueldo / retiros" v={-r.sueldo} />
             <Linea l="Resultado final" v={resultadoFinal} fuerte destacado />
@@ -132,12 +118,9 @@ export default function Resultado() {
           </div>
 
           <div className="text-xs text-muted-foreground space-y-1">
-            {r.ventasSinCosto > 0 && <p>· {r.ventasSinCosto} venta(s) del mes son de productos sin costo cargado — el costo de mercadería está subestimado.</p>}
-            {r.pedidosSinDetalle > 0 && <p>· {r.pedidosSinDetalle} venta(s) esporádica(s) se cargaron "por categoría" sin detalle de producto — sí están en los ingresos, pero su costo de mercadería no se pudo calcular.</p>}
-            <p>· El costo de las viandas entregadas a clientes mensualizados no está incluido en el costo de mercadería (la mensualidad se cobra como abono fijo).</p>
-            {r.compromisoDeudaMensual > 0 && <p>· Compromiso mensual de cuotas de deuda del negocio: {formatCurrency(r.compromisoDeudaMensual)} (lo efectivamente pagado este mes ya está dentro de "Gastos del negocio").</p>}
+            <p>· "Costo de mercadería" suma lo que cargaste en Gastos → Negocio bajo Verduras, Carnes, A granel, Mayorista (Makro), Packaging o Ingredientes. Si comprás algo de eso y lo cargás en otra categoría, no va a entrar acá — fijate la categoría al registrar el gasto.</p>
+            {r.compromisoDeudaMensual > 0 && <p>· Compromiso mensual de cuotas de deuda del negocio: {formatCurrency(r.compromisoDeudaMensual)} (lo efectivamente pagado este mes ya está dentro de los gastos).</p>}
             {r.gastosPersonales > 0 && <p>· Gastos personales del mes (aparte del negocio): {formatCurrency(r.gastosPersonales)}.</p>}
-            {cfg && <p>· Costo de mercadería calculado con: menores {cfg.menores_pct}%, respaldo productivo {cfg.fallback_productivo_pct}%.</p>}
           </div>
         </>
       )}
